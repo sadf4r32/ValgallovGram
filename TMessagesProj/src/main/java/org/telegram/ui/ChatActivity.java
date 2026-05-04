@@ -1571,6 +1571,9 @@ public class ChatActivity extends BaseFragment implements
     private final static int tag_message = 28;
     private final static int boost_group = 29;
 
+    // Valgallov: per-chat theme picker
+    private final static int valgallov_chat_theme = 249;
+
     private final static int bot_help = 30;
     private final static int bot_settings = 31;
     private final static int call = 32;
@@ -4049,6 +4052,9 @@ public class ChatActivity extends BaseFragment implements
                     }
                 } else if (id == change_colors) {
                     showChatThemeBottomSheet();
+                } else if (id == valgallov_chat_theme) {
+                    // Valgallov: per-chat Norse theme preset picker
+                    ValgallovChatThemeDialog.show(getParentActivity(), getDialogId(), () -> applyValgallovChatTheme());
                 } else if (id == topic_close) {
                     if (forumTopic == null)
                         return;
@@ -4429,6 +4435,8 @@ public class ChatActivity extends BaseFragment implements
             if (themeDelegate.isThemeChangeAvailable(true)) {
                 headerItem.lazilyAddSubItem(change_colors, R.drawable.msg_background, LocaleController.getString(R.string.SetWallpapers));
             }
+            // Valgallov: per-chat Norse theme preset
+            headerItem.lazilyAddSubItem(valgallov_chat_theme, R.drawable.msg_palette, "Чертог темы");
             if (currentUser != null && currentUser.self && getDialogId() != UserObject.VERIFY) {
                 headerItem.lazilyAddSubItem(add_shortcut, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
             }
@@ -8932,7 +8940,39 @@ public class ChatActivity extends BaseFragment implements
         ViewCompat.setOnApplyWindowInsetsListener(fragmentView, this::onApplyWindowInsets);
         Timer.finish(t);
 
+        // Valgallov: apply saved per-chat theme preset if any
+        try { applyValgallovChatTheme(); } catch (Throwable ignore) {}
+
         return fragmentView;
+    }
+
+    // Valgallov: overlay view for per-chat theme tint (added above wallpaper, below messages)
+    private View valgallovThemeOverlay;
+
+    private void applyValgallovChatTheme() {
+        if (contentView == null) return;
+        int preset = org.telegram.messenger.ValgallovChatThemeTracker.getPreset(getDialogId());
+        if (valgallovThemeOverlay == null) {
+            if (preset == 0) return;
+            valgallovThemeOverlay = new View(contentView.getContext());
+            valgallovThemeOverlay.setClickable(false);
+            valgallovThemeOverlay.setFocusable(false);
+            valgallovThemeOverlay.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            // index 1 = just above BackgroundView (which is always at index 0 in SizeNotifierFrameLayout)
+            int insertAt = contentView.backgroundView == null ? 0 : 1;
+            contentView.addView(valgallovThemeOverlay, insertAt, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        }
+        if (preset == 0) {
+            valgallovThemeOverlay.setBackgroundColor(0);
+            valgallovThemeOverlay.setVisibility(View.GONE);
+        } else {
+            int tint = org.telegram.messenger.ValgallovChatThemeTracker.getTintColor(preset);
+            // 50% alpha tint so wallpaper stays visible underneath
+            int color = (0x80 << 24) | (tint & 0x00FFFFFF);
+            valgallovThemeOverlay.setBackgroundColor(color);
+            valgallovThemeOverlay.setVisibility(View.VISIBLE);
+        }
     }
 
     private boolean lastImeVisible;
