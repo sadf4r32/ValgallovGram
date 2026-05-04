@@ -10711,6 +10711,30 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private ArrayList<TLRPC.Dialog> botShareDialogs;
 
+    /**
+     * Valgallov: filter out chats that the user marked as Тайные Чертоги.
+     * If the secret folder is currently unlocked (biometric just passed),
+     * we leave the list untouched so the user sees them inline.
+     */
+    private ArrayList<TLRPC.Dialog> filterValgallovHidden(ArrayList<TLRPC.Dialog> src) {
+        try {
+            if (src == null) return src;
+            if (!org.telegram.messenger.SharedConfig.valgallovHiddenChatsEnabled) return src;
+            if (org.telegram.messenger.ValgallovHiddenChatsTracker.isUnlockedNow()) return src;
+            if (org.telegram.messenger.ValgallovHiddenChatsTracker.count() == 0) return src;
+            ArrayList<TLRPC.Dialog> out = new ArrayList<>(src.size());
+            for (int i = 0, n = src.size(); i < n; i++) {
+                TLRPC.Dialog d = src.get(i);
+                if (d == null) continue;
+                if (org.telegram.messenger.ValgallovHiddenChatsTracker.isHidden(d.id)) continue;
+                out.add(d);
+            }
+            return out;
+        } catch (Throwable ignore) {
+            return src;
+        }
+    }
+
     @NonNull
     public ArrayList<TLRPC.Dialog> getDialogsArray(int currentAccount, int dialogsType, int folderId, boolean frozen) {
         if (frozen && frozenDialogsList != null) {
@@ -10718,7 +10742,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         MessagesController messagesController = AccountInstance.getInstance(currentAccount).getMessagesController();
         if (dialogsType == DIALOGS_TYPE_DEFAULT) {
-            return messagesController.getDialogs(folderId);
+            return filterValgallovHidden(messagesController.getDialogs(folderId));
         } else if (dialogsType == DIALOGS_TYPE_WIDGET || dialogsType == DIALOGS_TYPE_IMPORT_HISTORY) {
             return messagesController.dialogsServerOnly;
         } else if (dialogsType == DIALOGS_TYPE_ADD_USERS_TO) {

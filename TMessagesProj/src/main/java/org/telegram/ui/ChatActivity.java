@@ -1184,6 +1184,8 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_SUGGESTION_EDIT_TIME = 112;
     public final static int OPTION_SUGGESTION_EDIT_MESSAGE = 113;
     public final static int OPTION_SUGGESTION_ADD_OFFER = 114;
+    // Valgallov: view edit history of a message
+    public final static int OPTION_VALGALLOV_EDIT_HISTORY = 250;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -32843,6 +32845,14 @@ public class ChatActivity extends BaseFragment implements
                 selectedObjectToEditCaption = null;
                 break;
             }
+            case OPTION_VALGALLOV_EDIT_HISTORY: {
+                if (selectedObject != null) {
+                    org.telegram.ui.ValgallovEditHistoryDialog.show(getParentActivity(), themeDelegate, selectedObject);
+                }
+                selectedObject = null;
+                selectedObjectGroup = null;
+                break;
+            }
             case OPTION_EDIT_PRICE: {
                 final MessageObject msg = selectedObject;
                 TLRPC.TL_messageMediaPaidMedia paidMedia = (TLRPC.TL_messageMediaPaidMedia) selectedObject.messageOwner.media;
@@ -44409,6 +44419,17 @@ public class ChatActivity extends BaseFragment implements
                     items.add(LocaleController.getString(R.string.Edit));
                     options.add(OPTION_EDIT);
                     icons.add(R.drawable.msg_edit);
+                }
+                // Valgallov: show "Переписано" entry if we have stored previous versions for this message
+                try {
+                    if (org.telegram.messenger.SharedConfig.valgallovEditHistoryEnabled
+                            && message.getId() > 0
+                            && org.telegram.messenger.ValgallovEditTracker.hasVersions(message.getDialogId(), message.getId())) {
+                        items.add("Переписано");
+                        options.add(OPTION_VALGALLOV_EDIT_HISTORY);
+                        icons.add(R.drawable.msg_edit);
+                    }
+                } catch (Throwable ignore) {
                 }
                 if (ChatObject.isMonoForum(currentChat) && selectedObject.getGroupId() == 0 && selectedObjectGroup == null && message != null && message.messageOwner != null && message.messageOwner.suggested_post == null && message.messageOwner.action == null) {
                     items.add(LocaleController.getString(R.string.EditOfferAdd));

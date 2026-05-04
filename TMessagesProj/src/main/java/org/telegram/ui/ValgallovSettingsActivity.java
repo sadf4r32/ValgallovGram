@@ -22,6 +22,7 @@ import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
+import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 
@@ -48,6 +49,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int noContactsSyncRow;
     private int valgallovLanguageRow;
     private int hiddenChatsRow;
+    private int manageHiddenChatsRow;
     private int editHistoryRow;
     private int extraInfoRow;
 
@@ -76,6 +78,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
         noContactsSyncRow = rowCount++;
         valgallovLanguageRow = rowCount++;
         hiddenChatsRow = rowCount++;
+        manageHiddenChatsRow = SharedConfig.valgallovHiddenChatsEnabled ? rowCount++ : -1;
         editHistoryRow = rowCount++;
         extraInfoRow = rowCount++;
     }
@@ -179,6 +182,19 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 SharedConfig.toggleValgallovHiddenChatsEnabled();
                 newValue = SharedConfig.valgallovHiddenChatsEnabled;
                 changed = true;
+                updateRows();
+                if (listAdapter != null) listAdapter.notifyDataSetChanged();
+            } else if (manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) {
+                try {
+                    if (getParentActivity() instanceof LaunchActivity) {
+                        ValgallovHiddenChatsActivity.promptAndOpen((LaunchActivity) getParentActivity(), this);
+                    } else {
+                        org.telegram.messenger.ValgallovHiddenChatsTracker.markUnlocked();
+                        presentFragment(new ValgallovHiddenChatsActivity());
+                    }
+                } catch (Throwable ignore) {
+                }
+                return;
             } else if (position == editHistoryRow) {
                 SharedConfig.toggleValgallovEditHistoryEnabled();
                 newValue = SharedConfig.valgallovEditHistoryEnabled;
@@ -210,6 +226,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
         private static final int TYPE_CHECK = 1;
         private static final int TYPE_INFO = 2;
         private static final int TYPE_SHADOW = 3;
+        private static final int TYPE_SETTINGS = 4;
 
         private final Context mContext;
 
@@ -238,6 +255,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 }
                 return true;
             }
+            if (type == TYPE_SETTINGS) return true;
             return false;
         }
 
@@ -255,6 +273,10 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     break;
                 case TYPE_INFO:
                     view = new TextInfoPrivacyCell(mContext);
+                    break;
+                case TYPE_SETTINGS:
+                    view = new TextSettingsCell(mContext);
+                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
                 case TYPE_SHADOW:
                 default:
@@ -341,6 +363,15 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     }
                     break;
                 }
+                case TYPE_SETTINGS: {
+                    TextSettingsCell cell = (TextSettingsCell) holder.itemView;
+                    if (manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) {
+                        int n = org.telegram.messenger.ValgallovHiddenChatsTracker.count();
+                        cell.setTextAndValue("Управлять Тайными Чертогами",
+                            n == 0 ? "ничего не скрыто" : (n + " чат(ов) скрыто"), true);
+                    }
+                    break;
+                }
                 case TYPE_INFO: {
                     TextInfoPrivacyCell cell = (TextInfoPrivacyCell) holder.itemView;
                     if (position == ghostInfoRow) {
@@ -359,6 +390,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
+            } else if (manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) {
+                return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;
             }
