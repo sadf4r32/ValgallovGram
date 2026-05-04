@@ -1069,6 +1069,10 @@ public class NotificationsController extends BaseController {
                     }
                     continue;
                 }
+                // A3: suppress notifications for hidden chats
+                if (ValgallovHiddenChatsTracker.isHidden(messageObject.getDialogId())) {
+                    continue;
+                }
                 if (messageObject.isStoryPush) {
                     long date = messageObject.messageOwner == null ? System.currentTimeMillis() : messageObject.messageOwner.date * 1000L;
                     long dialogId = messageObject.getDialogId();

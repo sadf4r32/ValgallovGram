@@ -51,6 +51,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int hiddenChatsRow;
     private int manageHiddenChatsRow;
     private int editHistoryRow;
+    private int themePresetRow;
     private int extraInfoRow;
 
     @Override
@@ -80,6 +81,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
         hiddenChatsRow = rowCount++;
         manageHiddenChatsRow = SharedConfig.valgallovHiddenChatsEnabled ? rowCount++ : -1;
         editHistoryRow = rowCount++;
+        themePresetRow = rowCount++;
         extraInfoRow = rowCount++;
     }
 
@@ -199,6 +201,15 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 SharedConfig.toggleValgallovEditHistoryEnabled();
                 newValue = SharedConfig.valgallovEditHistoryEnabled;
                 changed = true;
+            } else if (position == themePresetRow) {
+                int next = (SharedConfig.valgallovThemePreset + 1) % 4;
+                org.telegram.messenger.ValgallovThemePresets.apply(next);
+                try {
+                    org.telegram.messenger.NotificationCenter.getGlobalInstance().postNotificationName(
+                        org.telegram.messenger.NotificationCenter.didSetNewTheme, false, false);
+                } catch (Throwable ignore) {}
+                if (listAdapter != null) listAdapter.notifyDataSetChanged();
+                return;
             }
 
             if (changed && view instanceof TextCheckCell) {
@@ -369,6 +380,9 @@ public class ValgallovSettingsActivity extends BaseFragment {
                         int n = org.telegram.messenger.ValgallovHiddenChatsTracker.count();
                         cell.setTextAndValue("Управлять Тайными Чертогами",
                             n == 0 ? "ничего не скрыто" : (n + " чат(ов) скрыто"), true);
+                    } else if (position == themePresetRow) {
+                        cell.setTextAndValue("Тема Чертога",
+                            org.telegram.messenger.ValgallovThemePresets.presetName(SharedConfig.valgallovThemePreset), true);
                     }
                     break;
                 }
@@ -390,7 +404,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if (manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;

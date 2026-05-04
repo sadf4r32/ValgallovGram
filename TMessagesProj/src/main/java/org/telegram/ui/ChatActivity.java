@@ -29054,6 +29054,19 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onResume() {
         super.onResume();
+        // A2: FLAG_SECURE for hidden chats — prevents screenshots and screen recording
+        try {
+            if (getParentActivity() != null) {
+                if (org.telegram.messenger.ValgallovHiddenChatsTracker.isHidden(dialog_id)) {
+                    getParentActivity().getWindow().setFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                } else {
+                    getParentActivity().getWindow().clearFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE);
+                }
+            }
+        } catch (Throwable ignore) {}
         checkShowBlur(false);
         activityResumeTime = System.currentTimeMillis();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
@@ -29254,6 +29267,13 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onPause() {
         super.onPause();
+        // A2: clear FLAG_SECURE when leaving the chat
+        try {
+            if (getParentActivity() != null) {
+                getParentActivity().getWindow().clearFlags(
+                    android.view.WindowManager.LayoutParams.FLAG_SECURE);
+            }
+        } catch (Throwable ignore) {}
         scrolling = false;
         if (scrimPopupWindow != null) {
             scrimPopupWindow.setPauseNotifications(false);
