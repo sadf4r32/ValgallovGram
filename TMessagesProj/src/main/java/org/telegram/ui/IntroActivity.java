@@ -45,6 +45,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -245,7 +246,15 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         frameContainerView.addView(frameLayout2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 78, 0, 0));
 
         TextureView textureView = new TextureView(context);
+        // Valgallov: hide the Telegram-style GL animation; replace with a static valknut.
+        textureView.setVisibility(View.INVISIBLE);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
+
+        // Valgallov: static valknut icon shown on every welcome page
+        ImageView valknutIcon = new ImageView(context);
+        valknutIcon.setImageResource(R.drawable.valgallov_valknut);
+        valknutIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        frameLayout2.addView(valknutIcon, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
@@ -969,37 +978,45 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     }
 
     private void updateColors(boolean fromTheme) {
-        startMessagingButtonBackground.setColors(new int[]{getThemedColor(Theme.key_featuredStickers_addButton), getThemedColor(Theme.key_featuredStickers_addButton2)});
-        // Valgallov: logoDrawable was removed when Page 1 title became plain text — guard against NPE
+        // Valgallov: pleasant Norse-steel palette for the welcome screen
+        final int valBg          = 0xFF15191F; // deep cold steel
+        final int valTitle       = 0xFFE5DBC4; // soft cream-white
+        final int valBody        = 0xFFB0B7C0; // muted grey-blue
+        final int valBtnGradA    = 0xFF5C6F8A; // pewter blue
+        final int valBtnGradB    = 0xFF7B8DA6; // lighter pewter
+        final int valBtnText     = 0xFFEDE6D2; // warm cream
+        final int valAccentLink  = 0xFFC9A86A; // muted gold (used for Continue + dot)
+
+        startMessagingButtonBackground.setColors(new int[]{valBtnGradA, valBtnGradB});
         if (logoDrawable != null) {
-            logoDrawable.setColorFilter(Theme.multAlpha(getThemedColor(Theme.key_actionBarDefaultTitle), 0.9f), PorterDuff.Mode.MULTIPLY);
+            logoDrawable.setColorFilter(valTitle, PorterDuff.Mode.MULTIPLY);
         }
-        fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-        switchLanguageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
-        startMessagingButton.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-        startMessagingButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(24), Color.TRANSPARENT, Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
-        darkThemeDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_featuredStickers_addButton), PorterDuff.Mode.SRC_IN));
+        fragmentView.setBackgroundColor(valBg);
+        switchLanguageTextView.setTextColor(valAccentLink);
+        startMessagingButton.setTextColor(valBtnText);
+        startMessagingButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(24), Color.TRANSPARENT, 0x33C9A86A));
+        darkThemeDrawable.setColorFilter(new PorterDuffColorFilter(valAccentLink, PorterDuff.Mode.SRC_IN));
         bottomPages.invalidate();
         if (fromTheme) {
             if (eglThread != null) {
                 eglThread.postRunnable(()->{
-                    eglThread.loadTexture(R.drawable.intro_powerful_mask, 17, Theme.getColor(Theme.key_windowBackgroundWhite), true);
+                    eglThread.loadTexture(R.drawable.intro_powerful_mask, 17, valBg, true);
                     eglThread.updatePowerfulTextures();
 
                     eglThread.loadTexture(eglThread.telegramMaskProvider, 23, true);
                     eglThread.updateTelegramTextures();
 
-                    Intro.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    Intro.setBackgroundColor(valBg);
                 });
             }
             for (int i = 0; i < viewPager.getChildCount(); i++) {
                 View ch = viewPager.getChildAt(i);
                 TextView headerTextView = ch.findViewWithTag(pagerHeaderTag);
-                headerTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+                headerTextView.setTextColor(valTitle);
                 TextView messageTextView = ch.findViewWithTag(pagerMessageTag);
-                messageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+                messageTextView.setTextColor(valBody);
             }
-        } else Intro.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+        } else Intro.setBackgroundColor(valBg);
     }
 
     @Override
