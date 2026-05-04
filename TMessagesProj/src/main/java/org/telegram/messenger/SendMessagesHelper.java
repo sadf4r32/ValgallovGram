@@ -4023,10 +4023,22 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     public void sendMessage(SendMessageParams sendMessageParams) {
-        // Valgallov: dispatch to JS plugins before sending
+        // Valgallov: dispatch to JS plugins before sending. A plugin may
+        //   - return null/undefined  → leave the message unchanged
+        //   - return Valgallov.CANCEL → cancel the send entirely
+        //   - return a string        → replace the outgoing text
         try {
             if (SharedConfig.valgallovPluginsEnabled && sendMessageParams != null && sendMessageParams.message != null) {
-                ValgallovPluginManager.dispatchOnSend(sendMessageParams.peer, sendMessageParams.message);
+                String rewritten = ValgallovPluginManager.dispatchOnSend(sendMessageParams.peer, sendMessageParams.message);
+                if (rewritten != null) {
+                    if (ValgallovPluginManager.CANCEL.equals(rewritten)) {
+                        return;
+                    }
+                    sendMessageParams.message = rewritten;
+                    // entities were indexed against the original text; drop them to avoid
+                    // offset/length mismatches after rewrite.
+                    sendMessageParams.entities = null;
+                }
             }
         } catch (Throwable ignore) {
         }
