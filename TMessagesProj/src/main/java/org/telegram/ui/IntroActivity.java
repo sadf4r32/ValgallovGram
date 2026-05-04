@@ -107,6 +107,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private TextView startMessagingButton;
     private FrameLayout frameLayout2;
     private ImageView valknutIcon;
+    private TextureView introTextureView;
     private FrameLayout frameContainerView;
 
     private RLottieDrawable darkThemeDrawable;
@@ -134,29 +135,30 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     public boolean onFragmentCreate() {
         MessagesController.getGlobalMainSettings().edit().putLong("intro_crashed_time", System.currentTimeMillis()).apply();
 
+        // Valgallov: hardcode welcome titles + descriptions so the Telegram
+        // server-side language pack can't override them.
         titles = new CharSequence[]{
-                null,
-                LocaleController.getString(R.string.Page2Title),
-                LocaleController.getString(R.string.Page3Title),
-                LocaleController.getString(R.string.Page5Title),
-                LocaleController.getString(R.string.Page4Title),
-                LocaleController.getString(R.string.Page6Title)
+                "ValgallovGram",
+                "Призрак",
+                "Вечная Память",
+                "Без Цепей",
+                "Свой",
+                "Братство"
         };
         messages = new String[]{
-                LocaleController.getString(R.string.Page1Message),
-                LocaleController.getString(R.string.Page2Message),
-                LocaleController.getString(R.string.Page3Message),
-                LocaleController.getString(R.string.Page5Message),
-                LocaleController.getString(R.string.Page4Message),
-                LocaleController.getString(R.string.Page6Message)
+                "**Чертог Павших.**\nЗдесь твои слова не умирают.",
+                "Сервер не знает что ты прочитал.\nНе знает что ты пишешь.\nНе знает что ты онлайн.",
+                "Удалённые сообщения остаются.\nНичто, написанное в Вальгалле,\nне теряется.",
+                "Защищённые медиа сохраняются.\nЗапреты не действуют.",
+                "Этот клиент знает только тебя.\nНе Telegram. Не Apple. Не Google.",
+                "Только ты, твои братья\nи Вальгалла."
         };
         return true;
     }
 
     @Override
     public View createView(Context context) {
-        // Valgallov: render Page 1 title as plain text instead of Telegram-logo image span
-        titles[0] = LocaleController.getString(R.string.Page1Title);
+        // Valgallov: titles[0] is hardcoded above, no LocaleController call here
 
 
         actionBar.setAddToContainer(false);
@@ -247,6 +249,9 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         frameContainerView.addView(frameLayout2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 78, 0, 0));
 
         TextureView textureView = new TextureView(context);
+        introTextureView = textureView;
+        // Valgallov: start invisible (we are on page 0, valknut covers it)
+        textureView.setAlpha(0f);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
 
         // Valgallov: valknut icon shown only on page 0, fades out as user swipes to page 1+
@@ -319,6 +324,9 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                     float distFromPage0 = position + positionOffset;
                     float a = 1f - Math.min(1f, distFromPage0);
                     valknutIcon.setAlpha(a);
+                    if (introTextureView != null) {
+                        introTextureView.setAlpha(1f - a);
+                    }
                 }
             }
 
