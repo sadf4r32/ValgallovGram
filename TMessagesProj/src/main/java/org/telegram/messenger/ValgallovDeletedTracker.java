@@ -167,12 +167,15 @@ public class ValgallovDeletedTracker {
         return sb;
     }
 
-    /** Get list of deleted message ids in a dialog (insertion order, oldest first). */
-    public static ArrayList<Integer> getDeletedList(long dialogId) {
+    /** Get list of deleted message ids in a dialog (insertion order, oldest first).
+     *  Also includes IDs from the global cache (updates without a dialogId). */
+    public static synchronized ArrayList<Integer> getDeletedList(long dialogId) {
         ensureLoaded();
         ArrayList<Integer> out = new ArrayList<>();
         LinkedHashSet<Integer> set = sCache.get(dialogId);
         if (set != null) out.addAll(set);
+        // Include global cache entries (TL_updateDeleteMessages has no dialogId)
+        if (!sGlobalCache.isEmpty()) out.addAll(sGlobalCache);
         return out;
     }
 }

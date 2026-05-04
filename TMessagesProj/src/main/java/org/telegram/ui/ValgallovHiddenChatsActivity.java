@@ -10,10 +10,14 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.biometric.BiometricManager;
@@ -26,6 +30,7 @@ import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.ValgallovHiddenChatsTracker;
 import org.telegram.tgnet.TLRPC;
@@ -33,11 +38,14 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.TextCheckCell;
+import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.Executor;
 
 public class ValgallovHiddenChatsActivity extends BaseFragment {
@@ -45,6 +53,12 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
     private RecyclerListView listView;
     private ListAdapter listAdapter;
     private final ArrayList<DialogRow> rows = new ArrayList<>();
+
+    private int headerRow;
+    private int infoRow;
+    private int dialogsStartRow;
+    private int dialogsEndRow;
+    private int totalRows;
 
     private static final class DialogRow {
         final long dialogId;
@@ -64,14 +78,34 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
         try {
             MessagesController mc = AccountInstance.getInstance(getCurrentAccount()).getMessagesController();
             ArrayList<TLRPC.Dialog> all = new ArrayList<>(mc.getAllDialogs());
+            // Sort: hidden chats first, then alphabetical
+            ArrayList<DialogRow> hidden = new ArrayList<>();
+            ArrayList<DialogRow> visible = new ArrayList<>();
             for (TLRPC.Dialog d : all) {
                 if (d == null) continue;
                 String title = resolveTitle(mc, d);
                 if (TextUtils.isEmpty(title)) title = String.valueOf(d.id);
-                rows.add(new DialogRow(d.id, title));
+                DialogRow row = new DialogRow(d.id, title);
+                if (ValgallovHiddenChatsTracker.isHidden(d.id)) {
+                    hidden.add(row);
+                } else {
+                    visible.add(row);
+                }
             }
+            rows.addAll(hidden);
+            rows.addAll(visible);
         } catch (Throwable ignore) {
         }
+        updateRowIndices();
+    }
+
+    private void updateRowIndices() {
+        totalRows = 0;
+        headerRow = totalRows++;
+        infoRow = totalRows++;
+        dialogsStartRow = totalRows;
+        dialogsEndRow = dialogsStartRow + rows.size();
+        totalRows = dialogsEndRow;
     }
 
     private String resolveTitle(MessagesController mc, TLRPC.Dialog d) {
@@ -108,14 +142,39 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
         FrameLayout frame = (FrameLayout) fragmentView;
         frame.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
 
+        if (rows.isEmpty()) {
+            LinearLayout emptyLayout = new LinearLayout(context);
+            emptyLayout.setOrientation(LinearLayout.VERTICAL);
+            emptyLayout.setGravity(Gravity.CENTER);
+
+            TextView runeText = new TextView(context);
+            runeText.setText("ᛈ");
+            runeText.setTextSize(48);
+            runeText.setTextColor(0xFF7A8AA0);
+            runeText.setGravity(Gravity.CENTER);
+            emptyLayout.addView(runeText, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 0, 0, 0, 12));
+
+            TextView empty = new TextView(context);
+            empty.setText("Нет диалогов для скрытия.\nОткрой чаты, потом вернись сюда.");
+            empty.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            empty.setTextSize(15);
+            empty.setGravity(Gravity.CENTER);
+            empty.setLineSpacing(AndroidUtilities.dp(4), 1f);
+            emptyLayout.addView(empty, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+
+            frame.addView(emptyLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.CENTER));
+            return fragmentView;
+        }
+
         listView = new RecyclerListView(context);
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setAdapter(listAdapter = new ListAdapter(context));
         frame.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         listView.setOnItemClickListener((view, position) -> {
-            if (position < 0 || position >= rows.size()) return;
-            DialogRow r = rows.get(position);
+            int dialogIndex = position - dialogsStartRow;
+            if (dialogIndex < 0 || dialogIndex >= rows.size()) return;
+            DialogRow r = rows.get(dialogIndex);
             boolean nowHidden = !ValgallovHiddenChatsTracker.isHidden(r.dialogId);
             if (nowHidden) {
                 ValgallovHiddenChatsTracker.hide(r.dialogId);
@@ -125,6 +184,10 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
             if (view instanceof TextCheckCell) {
                 ((TextCheckCell) view).setChecked(nowHidden);
             }
+            // Force dialogs list to refresh immediately
+            try {
+                NotificationCenter.getInstance(getCurrentAccount()).postNotificationName(NotificationCenter.dialogsNeedReload);
+            } catch (Throwable ignore) {}
         });
 
         return fragmentView;
@@ -139,36 +202,91 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
-        // Re-lock secret folder on leave
         ValgallovHiddenChatsTracker.lock();
+        // Ensure dialogs list refreshes after leaving
+        try {
+            NotificationCenter.getInstance(getCurrentAccount()).postNotificationName(NotificationCenter.dialogsNeedReload);
+        } catch (Throwable ignore) {}
     }
 
     private class ListAdapter extends RecyclerListView.SelectionAdapter {
+
+        private static final int TYPE_HEADER = 0;
+        private static final int TYPE_INFO = 1;
+        private static final int TYPE_CHECK = 2;
 
         private final Context mContext;
         ListAdapter(Context c) { mContext = c; }
 
         @Override
-        public boolean isEnabled(RecyclerView.ViewHolder holder) { return true; }
+        public boolean isEnabled(RecyclerView.ViewHolder holder) {
+            return holder.getItemViewType() == TYPE_CHECK;
+        }
 
         @Override
-        public int getItemCount() { return rows.size(); }
+        public int getItemCount() { return totalRows; }
+
+        @Override
+        public int getItemViewType(int position) {
+            if (position == headerRow) return TYPE_HEADER;
+            if (position == infoRow) return TYPE_INFO;
+            return TYPE_CHECK;
+        }
 
         @NonNull
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
-            TextCheckCell cell = new TextCheckCell(mContext);
-            cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-            cell.setLayoutParams(new RecyclerView.LayoutParams(
+            View view;
+            switch (viewType) {
+                case TYPE_HEADER:
+                    view = new HeaderCell(mContext);
+                    view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    break;
+                case TYPE_INFO:
+                    view = new TextInfoPrivacyCell(mContext);
+                    break;
+                case TYPE_CHECK:
+                default:
+                    TextCheckCell cell = new TextCheckCell(mContext);
+                    cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    view = cell;
+                    break;
+            }
+            view.setLayoutParams(new RecyclerView.LayoutParams(
                 RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
-            return new RecyclerListView.Holder(cell);
+            return new RecyclerListView.Holder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            DialogRow r = rows.get(position);
-            TextCheckCell cell = (TextCheckCell) holder.itemView;
-            cell.setTextAndCheck(r.title, ValgallovHiddenChatsTracker.isHidden(r.dialogId), position < rows.size() - 1);
+            switch (holder.getItemViewType()) {
+                case TYPE_HEADER: {
+                    HeaderCell cell = (HeaderCell) holder.itemView;
+                    int hiddenCount = ValgallovHiddenChatsTracker.count();
+                    cell.setText(hiddenCount > 0
+                        ? "Скрыто чатов: " + hiddenCount
+                        : "Выбери чаты для скрытия");
+                    break;
+                }
+                case TYPE_INFO: {
+                    TextInfoPrivacyCell cell = (TextInfoPrivacyCell) holder.itemView;
+                    cell.setText("Отмеченные чаты исчезнут из основного списка. Доступ к ним — только через Настройки → ValgallovGram → Управлять Тайными Чертогами после проверки биометрии.");
+                    break;
+                }
+                case TYPE_CHECK: {
+                    int dialogIndex = position - dialogsStartRow;
+                    if (dialogIndex >= 0 && dialogIndex < rows.size()) {
+                        DialogRow r = rows.get(dialogIndex);
+                        TextCheckCell cell = (TextCheckCell) holder.itemView;
+                        boolean isHidden = ValgallovHiddenChatsTracker.isHidden(r.dialogId);
+                        cell.setTextAndCheck(
+                            (isHidden ? "ᛈ  " : "") + r.title,
+                            isHidden,
+                            dialogIndex < rows.size() - 1);
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -180,7 +298,6 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
     public static void promptAndOpen(LaunchActivity activity, BaseFragment from) {
         if (activity == null || from == null) return;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            // No biometric API — open directly
             ValgallovHiddenChatsTracker.markUnlocked();
             from.presentFragment(new ValgallovHiddenChatsActivity());
             return;
@@ -190,7 +307,6 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
                 | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
         int can = bm.canAuthenticate(allowed);
         if (can != BiometricManager.BIOMETRIC_SUCCESS) {
-            // Fallback: open without auth (no biometric available)
             ValgallovHiddenChatsTracker.markUnlocked();
             from.presentFragment(new ValgallovHiddenChatsActivity());
             return;

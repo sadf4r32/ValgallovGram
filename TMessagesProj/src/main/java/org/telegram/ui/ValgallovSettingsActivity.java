@@ -207,8 +207,13 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 try {
                     org.telegram.messenger.NotificationCenter.getGlobalInstance().postNotificationName(
                         org.telegram.messenger.NotificationCenter.didSetNewTheme, false, false);
+                    org.telegram.messenger.NotificationCenter.getGlobalInstance().postNotificationName(
+                        org.telegram.messenger.NotificationCenter.reloadInterface);
                 } catch (Throwable ignore) {}
-                if (listAdapter != null) listAdapter.notifyDataSetChanged();
+                // Recreate this fragment to show new colors immediately
+                if (getParentActivity() != null) {
+                    getParentActivity().recreate();
+                }
                 return;
             }
 
