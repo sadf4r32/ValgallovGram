@@ -106,6 +106,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private GradientDrawable startMessagingButtonBackground;
     private TextView startMessagingButton;
     private FrameLayout frameLayout2;
+    private ImageView valknutIcon;
     private FrameLayout frameContainerView;
 
     private RLottieDrawable darkThemeDrawable;
@@ -246,12 +247,10 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         frameContainerView.addView(frameLayout2, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 78, 0, 0));
 
         TextureView textureView = new TextureView(context);
-        // Valgallov: hide the Telegram-style GL animation; replace with a static valknut.
-        textureView.setVisibility(View.INVISIBLE);
         frameLayout2.addView(textureView, LayoutHelper.createFrame(ICON_WIDTH_DP, ICON_HEIGHT_DP, Gravity.CENTER));
 
-        // Valgallov: static valknut icon shown on every welcome page
-        ImageView valknutIcon = new ImageView(context);
+        // Valgallov: valknut icon shown only on page 0, fades out as user swipes to page 1+
+        valknutIcon = new ImageView(context);
         valknutIcon.setImageResource(R.drawable.valgallov_valknut);
         valknutIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         frameLayout2.addView(valknutIcon, LayoutHelper.createFrame(ICON_HEIGHT_DP, ICON_HEIGHT_DP, Gravity.CENTER));
@@ -314,6 +313,13 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 }
                 float offset = (position * width + positionOffsetPixels - currentViewPagerPage * width) / width;
                 Intro.setScrollOffset(offset);
+
+                // Valgallov: fade valknut as user swipes off page 0; restore Telegram GL on pages 1+
+                if (valknutIcon != null) {
+                    float distFromPage0 = position + positionOffset;
+                    float a = 1f - Math.min(1f, distFromPage0);
+                    valknutIcon.setAlpha(a);
+                }
             }
 
             @Override
