@@ -50,6 +50,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int valgallovLanguageRow;
     private int hiddenChatsRow;
     private int manageHiddenChatsRow;
+    private int searchHiddenRow;
     private int editHistoryRow;
     private int themePresetRow;
     private int showSecondsRow;
@@ -86,6 +87,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
         valgallovLanguageRow = rowCount++;
         hiddenChatsRow = rowCount++;
         manageHiddenChatsRow = SharedConfig.valgallovHiddenChatsEnabled ? rowCount++ : -1;
+        searchHiddenRow = SharedConfig.valgallovHiddenChatsEnabled ? rowCount++ : -1;
         editHistoryRow = rowCount++;
         themePresetRow = rowCount++;
         showSecondsRow = rowCount++;
@@ -205,6 +207,17 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else {
                         org.telegram.messenger.ValgallovHiddenChatsTracker.markUnlocked();
                         presentFragment(new ValgallovHiddenChatsActivity());
+                    }
+                } catch (Throwable ignore) {
+                }
+                return;
+            } else if (searchHiddenRow != -1 && position == searchHiddenRow) {
+                try {
+                    if (getParentActivity() instanceof LaunchActivity) {
+                        ValgallovSearchHiddenActivity.promptAndOpen((LaunchActivity) getParentActivity(), this);
+                    } else {
+                        org.telegram.messenger.ValgallovHiddenChatsTracker.markUnlocked();
+                        presentFragment(new ValgallovSearchHiddenActivity());
                     }
                 } catch (Throwable ignore) {
                 }
@@ -459,6 +472,10 @@ public class ValgallovSettingsActivity extends BaseFragment {
                         int n = org.telegram.messenger.ValgallovHiddenChatsTracker.count();
                         cell.setTextAndValue("Управлять Тайными Чертогами",
                             n == 0 ? "ничего не скрыто" : (n + " чат(ов) скрыто"), true);
+                    } else if (searchHiddenRow != -1 && position == searchHiddenRow) {
+                        int n = org.telegram.messenger.ValgallovHiddenChatsTracker.count();
+                        cell.setTextAndValue("Поиск в Тайных Чертогах",
+                            n == 0 ? "нечего искать" : ("среди " + n + " скрытых"), true);
                     } else if (position == themePresetRow) {
                         cell.setTextAndValue("Тема Чертога",
                             org.telegram.messenger.ValgallovThemePresets.presetName(SharedConfig.valgallovThemePreset), true);
@@ -496,7 +513,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || (searchHiddenRow != -1 && position == searchHiddenRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;
