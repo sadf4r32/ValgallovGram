@@ -322,6 +322,13 @@ public class ApplicationLoader extends Application {
 
         }
 
+        // Valgallov: install a crash dumper so we can recover diagnostics from
+        // the user's Download folder when the app refuses to launch.
+        try {
+            ValgallovCrashHandler.install(applicationContext);
+        } catch (Throwable ignore) {
+        }
+
         super.onCreate();
 
         if (BuildVars.LOGS_ENABLED) {
