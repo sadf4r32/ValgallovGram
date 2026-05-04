@@ -1186,6 +1186,7 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_SUGGESTION_ADD_OFFER = 114;
     // Valgallov: view edit history of a message
     public final static int OPTION_VALGALLOV_EDIT_HISTORY = 250;
+    public final static int OPTION_VALGALLOV_READ_LATER = 251;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -32938,6 +32939,41 @@ public class ChatActivity extends BaseFragment implements
                 selectedObjectGroup = null;
                 break;
             }
+            case OPTION_VALGALLOV_READ_LATER: {
+                if (selectedObject != null) {
+                    try {
+                        long did = selectedObject.getDialogId();
+                        int mid = selectedObject.getId();
+                        if (org.telegram.messenger.ValgallovReadLaterTracker.isBookmarked(did, mid)) {
+                            org.telegram.messenger.ValgallovReadLaterTracker.remove(did, mid);
+                            android.widget.Toast.makeText(getParentActivity(), "Убрано из «Позже»", android.widget.Toast.LENGTH_SHORT).show();
+                        } else {
+                            String text = selectedObject.messageOwner.message;
+                            if (text == null || text.isEmpty()) {
+                                text = selectedObject.messageText != null ? selectedObject.messageText.toString() : "[медиа]";
+                            }
+                            String senderName = null;
+                            try {
+                                if (selectedObject.messageOwner.from_id != null) {
+                                    long sid = org.telegram.messenger.DialogObject.getPeerDialogId(selectedObject.messageOwner.from_id);
+                                    if (sid > 0) {
+                                        org.telegram.tgnet.TLRPC.User u = getMessagesController().getUser(sid);
+                                        if (u != null) senderName = org.telegram.messenger.UserObject.getFirstName(u);
+                                    }
+                                }
+                            } catch (Throwable ignore2) {}
+                            String chatName = null;
+                            if (currentUser != null) chatName = org.telegram.messenger.UserObject.getFirstName(currentUser);
+                            else if (currentChat != null) chatName = currentChat.title;
+                            org.telegram.messenger.ValgallovReadLaterTracker.save(did, mid, text, selectedObject.messageOwner.date, senderName, chatName);
+                            android.widget.Toast.makeText(getParentActivity(), "Сохранено в «Позже»", android.widget.Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Throwable ignore) {}
+                }
+                selectedObject = null;
+                selectedObjectGroup = null;
+                break;
+            }
             case OPTION_EDIT_PRICE: {
                 final MessageObject msg = selectedObject;
                 TLRPC.TL_messageMediaPaidMedia paidMedia = (TLRPC.TL_messageMediaPaidMedia) selectedObject.messageOwner.media;
@@ -44513,6 +44549,16 @@ public class ChatActivity extends BaseFragment implements
                         items.add("Переписано");
                         options.add(OPTION_VALGALLOV_EDIT_HISTORY);
                         icons.add(R.drawable.msg_edit);
+                    }
+                } catch (Throwable ignore) {
+                }
+                // Valgallov: "Прочитать позже" bookmark
+                try {
+                    if (message.getId() > 0) {
+                        boolean alreadyBookmarked = org.telegram.messenger.ValgallovReadLaterTracker.isBookmarked(message.getDialogId(), message.getId());
+                        items.add(alreadyBookmarked ? "Убрать из «Позже»" : "Прочитать позже");
+                        options.add(OPTION_VALGALLOV_READ_LATER);
+                        icons.add(R.drawable.msg_saved);
                     }
                 } catch (Throwable ignore) {
                 }

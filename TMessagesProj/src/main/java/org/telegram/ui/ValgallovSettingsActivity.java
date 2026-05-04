@@ -55,6 +55,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int showSecondsRow;
     private int antiScreenRecordRow;
     private int quickMuteRow;
+    private int backupRow;
+    private int readLaterRow;
     private int deletedHistoryRow;
     private int extraInfoRow;
 
@@ -89,6 +91,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
         showSecondsRow = rowCount++;
         antiScreenRecordRow = rowCount++;
         quickMuteRow = rowCount++;
+        backupRow = rowCount++;
+        readLaterRow = rowCount++;
         deletedHistoryRow = rowCount++;
         extraInfoRow = rowCount++;
     }
@@ -250,6 +254,29 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 } catch (Throwable e) {
                     android.widget.Toast.makeText(getParentActivity(), "Ошибка: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
                 }
+                return;
+            } else if (position == backupRow) {
+                // Show PIN dialog for backup
+                android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(getParentActivity());
+                builder.setTitle("Бэкап данных");
+                builder.setMessage("Введите PIN для шифрования бэкапа (удалённые + редактированные):");
+                final android.widget.EditText input = new android.widget.EditText(getParentActivity());
+                input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+                input.setHint("PIN (4+ цифр)");
+                builder.setView(input);
+                builder.setPositiveButton("Создать бэкап", (d, w) -> {
+                    String pin = input.getText().toString().trim();
+                    if (pin.length() < 4) {
+                        android.widget.Toast.makeText(getParentActivity(), "PIN должен быть минимум 4 символа", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    org.telegram.messenger.ValgallovBackupManager.backup(getParentActivity(), pin);
+                });
+                builder.setNegativeButton("Отмена", null);
+                builder.show();
+                return;
+            } else if (position == readLaterRow) {
+                presentFragment(new ValgallovReadLaterActivity());
                 return;
             } else if (position == deletedHistoryRow) {
                 presentFragment(new ValgallovDeletedHistoryActivity(0));
@@ -438,6 +465,13 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else if (position == quickMuteRow) {
                         cell.setTextAndValue("Замутить все чаты",
                             "Отключить уведомления для всех диалогов", true);
+                    } else if (position == backupRow) {
+                        cell.setTextAndValue("Бэкап данных",
+                            "Зашифрованный бэкап удалённых и редактированных", true);
+                    } else if (position == readLaterRow) {
+                        int n = org.telegram.messenger.ValgallovReadLaterTracker.count();
+                        cell.setTextAndValue("Прочитать позже",
+                            n > 0 ? (n + " сообщ.") : "пусто", true);
                     } else if (position == deletedHistoryRow) {
                         cell.setTextAndValue("Вся история стёртого",
                             "Удалённые сообщения из всех чатов", false);
@@ -462,7 +496,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow || position == quickMuteRow || position == deletedHistoryRow) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;
