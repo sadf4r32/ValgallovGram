@@ -604,13 +604,14 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 }
             };
 
-            headerTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            // Valgallov: hardcoded Norse-steel text colors so they stay readable on our welcome bg
+            headerTextView.setTextColor(0xFFE5DBC4);
             headerTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 26);
             headerTextView.setTypeface(AndroidUtilities.bold());
             headerTextView.setGravity(Gravity.CENTER);
             frameLayout.addView(headerTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 18, 244, 18, 0));
 
-            messageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            messageTextView.setTextColor(0xFFB0B7C0);
             messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             messageTextView.setLineSpacing(dpf2(2.33f), 1f);
             messageTextView.setGravity(Gravity.CENTER);
