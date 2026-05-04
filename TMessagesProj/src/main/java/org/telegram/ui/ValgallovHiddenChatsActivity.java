@@ -175,22 +175,58 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
             int dialogIndex = position - dialogsStartRow;
             if (dialogIndex < 0 || dialogIndex >= rows.size()) return;
             DialogRow r = rows.get(dialogIndex);
-            boolean nowHidden = !ValgallovHiddenChatsTracker.isHidden(r.dialogId);
-            if (nowHidden) {
-                ValgallovHiddenChatsTracker.hide(r.dialogId);
-            } else {
-                ValgallovHiddenChatsTracker.unhide(r.dialogId);
+            // If hidden — tap opens the chat directly
+            if (ValgallovHiddenChatsTracker.isHidden(r.dialogId)) {
+                openChat(r.dialogId);
+                return;
             }
+            // Otherwise toggle hide/unhide
+            ValgallovHiddenChatsTracker.hide(r.dialogId);
             if (view instanceof TextCheckCell) {
-                ((TextCheckCell) view).setChecked(nowHidden);
+                ((TextCheckCell) view).setChecked(true);
             }
-            // Force dialogs list to refresh immediately
             try {
                 NotificationCenter.getInstance(getCurrentAccount()).postNotificationName(NotificationCenter.dialogsNeedReload);
             } catch (Throwable ignore) {}
         });
 
+        listView.setOnItemLongClickListener((view, position) -> {
+            int dialogIndex = position - dialogsStartRow;
+            if (dialogIndex < 0 || dialogIndex >= rows.size()) return false;
+            DialogRow r = rows.get(dialogIndex);
+            boolean isHidden = ValgallovHiddenChatsTracker.isHidden(r.dialogId);
+            if (isHidden) {
+                // Long-press on hidden chat → unhide
+                ValgallovHiddenChatsTracker.unhide(r.dialogId);
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(false);
+                }
+            } else {
+                // Long-press on visible chat → hide
+                ValgallovHiddenChatsTracker.hide(r.dialogId);
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(true);
+                }
+            }
+            try {
+                NotificationCenter.getInstance(getCurrentAccount()).postNotificationName(NotificationCenter.dialogsNeedReload);
+            } catch (Throwable ignore) {}
+            return true;
+        });
+
         return fragmentView;
+    }
+
+    private void openChat(long dialogId) {
+        try {
+            android.os.Bundle args = new android.os.Bundle();
+            if (dialogId > 0) {
+                args.putLong("user_id", dialogId);
+            } else {
+                args.putLong("chat_id", -dialogId);
+            }
+            presentFragment(new ChatActivity(args));
+        } catch (Throwable ignore) {}
     }
 
     @Override
@@ -270,7 +306,7 @@ public class ValgallovHiddenChatsActivity extends BaseFragment {
                 }
                 case TYPE_INFO: {
                     TextInfoPrivacyCell cell = (TextInfoPrivacyCell) holder.itemView;
-                    cell.setText("Отмеченные чаты исчезнут из основного списка. Доступ к ним — только через Настройки → ValgallovGram → Управлять Тайными Чертогами после проверки биометрии.");
+                    cell.setText("Тап — войти в скрытый чат. Долгое нажатие — скрыть/раскрыть. Отмеченные чаты исчезнут из основного списка и поиска.");
                     break;
                 }
                 case TYPE_CHECK: {

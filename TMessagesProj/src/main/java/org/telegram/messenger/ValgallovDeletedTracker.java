@@ -21,7 +21,25 @@ import java.util.Set;
  */
 public class ValgallovDeletedTracker {
 
+    /** Stored content of a deleted message. */
+    public static final class DeletedMessage {
+        public final long dialogId;
+        public final int msgId;
+        public final String text;
+        public final int date;
+        public final boolean outgoing;
+
+        public DeletedMessage(long dialogId, int msgId, String text, int date, boolean outgoing) {
+            this.dialogId = dialogId;
+            this.msgId = msgId;
+            this.text = text;
+            this.date = date;
+            this.outgoing = outgoing;
+        }
+    }
+
     private static final String PREFS_NAME = "valgallov_deleted_v2";
+    private static final String CONTENT_PREFS = "valgallov_deleted_content_v1";
     private static final int MAX_PER_DIALOG = 5000;
 
     /** Right-side suffix for deleted messages (Norse rune Hagalaz). */
@@ -176,6 +194,89 @@ public class ValgallovDeletedTracker {
         if (set != null) out.addAll(set);
         // Include global cache entries (TL_updateDeleteMessages has no dialogId)
         if (!sGlobalCache.isEmpty()) out.addAll(sGlobalCache);
+        return out;
+    }
+
+    // --- Content storage for deleted messages ---
+
+    private static final char FIELD_SEP = '\u001F';
+    private static final char RECORD_SEP = '\u001E';
+
+    private static SharedPreferences getContentPrefs() {
+        return ApplicationLoader.applicationContext.getSharedPreferences(CONTENT_PREFS, 0);
+    }
+
+    /** Save the actual content of a deleted message. */
+    public static void saveContent(long dialogId, int msgId, String text, int date, boolean outgoing) {
+        if (text == null || text.isEmpty()) return;
+        try {
+            String sanitized = text.replace(FIELD_SEP, ' ').replace(RECORD_SEP, ' ');
+            // Format: date|outgoing|text
+            String value = date + String.valueOf(FIELD_SEP) + (outgoing ? "1" : "0") + FIELD_SEP + sanitized;
+            getContentPrefs().edit().putString(dialogId + ":" + msgId, value).apply();
+        } catch (Throwable ignore) {}
+    }
+
+    /** Get saved content of a specific deleted message. */
+    public static DeletedMessage getContent(long dialogId, int msgId) {
+        try {
+            String val = getContentPrefs().getString(dialogId + ":" + msgId, null);
+            if (val == null) {
+                // Try global (dialogId=0)
+                val = getContentPrefs().getString("0:" + msgId, null);
+                if (val == null) return null;
+                dialogId = 0;
+            }
+            return parseContentValue(dialogId, msgId, val);
+        } catch (Throwable ignore) {
+            return null;
+        }
+    }
+
+    private static DeletedMessage parseContentValue(long dialogId, int msgId, String val) {
+        String[] parts = val.split(String.valueOf(FIELD_SEP), 3);
+        if (parts.length < 3) return null;
+        int date = 0;
+        try { date = Integer.parseInt(parts[0]); } catch (Throwable ignore) {}
+        boolean out = "1".equals(parts[1]);
+        return new DeletedMessage(dialogId, msgId, parts[2], date, out);
+    }
+
+    /** Get all deleted messages with saved content for a dialog. Returns newest first. */
+    public static ArrayList<DeletedMessage> getDeletedMessages(long dialogId) {
+        ArrayList<DeletedMessage> out = new ArrayList<>();
+        ArrayList<Integer> ids = getDeletedList(dialogId);
+        for (Integer id : ids) {
+            DeletedMessage dm = getContent(dialogId, id);
+            if (dm != null) {
+                out.add(dm);
+            }
+        }
+        java.util.Collections.reverse(out);
+        return out;
+    }
+
+    /** Get ALL deleted messages with saved content across ALL dialogs. Returns newest first. */
+    public static ArrayList<DeletedMessage> getAllDeletedMessages() {
+        ArrayList<DeletedMessage> out = new ArrayList<>();
+        try {
+            java.util.Map<String, ?> all = getContentPrefs().getAll();
+            for (java.util.Map.Entry<String, ?> e : all.entrySet()) {
+                String key = e.getKey();
+                Object val = e.getValue();
+                if (!(val instanceof String)) continue;
+                try {
+                    int colonIdx = key.indexOf(':');
+                    if (colonIdx < 0) continue;
+                    long did = Long.parseLong(key.substring(0, colonIdx));
+                    int mid = Integer.parseInt(key.substring(colonIdx + 1));
+                    DeletedMessage dm = parseContentValue(did, mid, (String) val);
+                    if (dm != null) out.add(dm);
+                } catch (Throwable ignore) {}
+            }
+        } catch (Throwable ignore) {}
+        // Sort by date descending
+        java.util.Collections.sort(out, (a, b) -> Integer.compare(b.date, a.date));
         return out;
     }
 }

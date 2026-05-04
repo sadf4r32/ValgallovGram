@@ -283,6 +283,16 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     }
 
     private boolean filter(Object obj) {
+        // Valgallov: filter out hidden chats from search results
+        try {
+            long did = 0;
+            if (obj instanceof TLRPC.User) did = ((TLRPC.User) obj).id;
+            else if (obj instanceof TLRPC.Chat) did = -((TLRPC.Chat) obj).id;
+            else if (obj instanceof TLRPC.EncryptedChat) did = DialogObject.makeEncryptedDialogId(((TLRPC.EncryptedChat) obj).id);
+            if (did != 0 && org.telegram.messenger.ValgallovHiddenChatsTracker.isHidden(did)) {
+                return false;
+            }
+        } catch (Throwable ignore) {}
         if (dialogsType != DialogsActivity.DIALOGS_TYPE_START_ATTACH_BOT) {
             return true;
         }
@@ -642,8 +652,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                                     continue;
                                 }
                             }
-                            searchResultMessages.add(msg);
+                            // Valgallov: skip messages from hidden chats
                             long dialog_id = MessageObject.getDialogId(message);
+                            try {
+                                if (org.telegram.messenger.ValgallovHiddenChatsTracker.isHidden(dialog_id)) continue;
+                            } catch (Throwable ignore) {}
+                            searchResultMessages.add(msg);
                             ConcurrentHashMap<Long, Integer> read_max = message.out ? MessagesController.getInstance(currentAccount).dialogs_read_outbox_max : MessagesController.getInstance(currentAccount).dialogs_read_inbox_max;
                             Integer value = read_max.get(dialog_id);
                             if (value != null) {

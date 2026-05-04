@@ -52,6 +52,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int manageHiddenChatsRow;
     private int editHistoryRow;
     private int themePresetRow;
+    private int showSecondsRow;
+    private int deletedHistoryRow;
     private int extraInfoRow;
 
     @Override
@@ -82,6 +84,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
         manageHiddenChatsRow = SharedConfig.valgallovHiddenChatsEnabled ? rowCount++ : -1;
         editHistoryRow = rowCount++;
         themePresetRow = rowCount++;
+        showSecondsRow = rowCount++;
+        deletedHistoryRow = rowCount++;
         extraInfoRow = rowCount++;
     }
 
@@ -204,16 +208,26 @@ public class ValgallovSettingsActivity extends BaseFragment {
             } else if (position == themePresetRow) {
                 int next = (SharedConfig.valgallovThemePreset + 1) % 4;
                 org.telegram.messenger.ValgallovThemePresets.apply(next);
+                String themeName = org.telegram.messenger.ValgallovThemePresets.presetName(next);
+                try {
+                    android.widget.Toast.makeText(getParentActivity(), "Тема: " + themeName, android.widget.Toast.LENGTH_SHORT).show();
+                } catch (Throwable ignore) {}
                 try {
                     org.telegram.messenger.NotificationCenter.getGlobalInstance().postNotificationName(
                         org.telegram.messenger.NotificationCenter.didSetNewTheme, false, false);
                     org.telegram.messenger.NotificationCenter.getGlobalInstance().postNotificationName(
                         org.telegram.messenger.NotificationCenter.reloadInterface);
                 } catch (Throwable ignore) {}
-                // Recreate this fragment to show new colors immediately
                 if (getParentActivity() != null) {
                     getParentActivity().recreate();
                 }
+                return;
+            } else if (position == showSecondsRow) {
+                SharedConfig.toggleValgallovShowSeconds();
+                newValue = SharedConfig.valgallovShowSeconds;
+                changed = true;
+            } else if (position == deletedHistoryRow) {
+                presentFragment(new ValgallovDeletedHistoryActivity(0));
                 return;
             }
 
@@ -375,7 +389,11 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else if (position == editHistoryRow) {
                         cell.setTextAndValueAndCheck("История переписанного",
                             "Сохранять предыдущие версии редактированных сообщений",
-                            SharedConfig.valgallovEditHistoryEnabled, false, true);
+                            SharedConfig.valgallovEditHistoryEnabled, true, true);
+                    } else if (position == showSecondsRow) {
+                        cell.setTextAndValueAndCheck("Секунды в часах",
+                            "Показывать HH:MM:SS вместо HH:MM",
+                            SharedConfig.valgallovShowSeconds, false, true);
                     }
                     break;
                 }
@@ -388,6 +406,9 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else if (position == themePresetRow) {
                         cell.setTextAndValue("Тема Чертога",
                             org.telegram.messenger.ValgallovThemePresets.presetName(SharedConfig.valgallovThemePreset), true);
+                    } else if (position == deletedHistoryRow) {
+                        cell.setTextAndValue("Вся история стёртого",
+                            "Удалённые сообщения из всех чатов", false);
                     }
                     break;
                 }
@@ -409,7 +430,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow || position == deletedHistoryRow) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;

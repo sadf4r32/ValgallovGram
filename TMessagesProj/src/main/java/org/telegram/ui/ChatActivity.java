@@ -21812,6 +21812,17 @@ public class ChatActivity extends BaseFragment implements
                     MessageObject msg = messages.get(i);
                     if (msg == null || msg.messageOwner == null) continue;
                     if (idSet.contains(msg.messageOwner.id)) {
+                        // Save the actual message content before marking as deleted
+                        try {
+                            String text = msg.messageOwner.message;
+                            if (text == null || text.isEmpty()) {
+                                text = msg.messageText != null ? msg.messageText.toString() : null;
+                            }
+                            if (text != null && !text.isEmpty()) {
+                                long saveDid = markedDialogId != 0 ? markedDialogId : dialog_id;
+                                org.telegram.messenger.ValgallovDeletedTracker.saveContent(saveDid, msg.messageOwner.id, text, msg.messageOwner.date, msg.isOutOwner());
+                            }
+                        } catch (Throwable ignore) {}
                         try {
                             msg.messageText = org.telegram.messenger.ValgallovDeletedTracker.markDeleted(msg.messageText);
                             msg.textLayoutBlocks = null;
@@ -25950,6 +25961,16 @@ public class ChatActivity extends BaseFragment implements
                 pinnedMessageObjects.put(messageObject.getId(), messageObject);
             }
             MessageObject old = messagesDict[loadIndex].get(messageObject.getId());
+            // Valgallov: snapshot previous text before replacing with edited version
+            try {
+                if (org.telegram.messenger.SharedConfig.valgallovEditHistoryEnabled
+                        && old != null && old.messageOwner != null && old.messageOwner.message != null
+                        && messageObject.messageOwner != null && messageObject.messageOwner.message != null
+                        && !old.messageOwner.message.equals(messageObject.messageOwner.message)) {
+                    org.telegram.messenger.ValgallovEditTracker.recordPreviousVersion(
+                        dialog_id, old.getId(), old.messageOwner.message);
+                }
+            } catch (Throwable ignore) {}
             if (messageObject.getId() > 0 && old == null && UserObject.isBot(currentUser)) {
                 old = BotForumHelper.getInstance(currentAccount).onBotForumDraftCheckNewMessages(currentUser.id, (int) getTopicId(), messageObject.getId(), messageObject.messageText.toString());
                 if (old != null) {

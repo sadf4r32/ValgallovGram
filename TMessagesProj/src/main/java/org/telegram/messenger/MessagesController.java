@@ -16854,6 +16854,15 @@ public class MessagesController extends BaseController implements NotificationCe
                 FileLog.d("Valgallov: skipping push-delete for " + ids.size() + " message(s) in dialog " + dialogId);
             }
             ValgallovDeletedTracker.markDeleted(dialogId, ids);
+            // Try to save message content from dialogMessagesByIds
+            for (Integer id : ids) {
+                try {
+                    MessageObject msg = dialogMessagesByIds.get(id);
+                    if (msg != null && msg.messageOwner != null && msg.messageOwner.message != null && !msg.messageOwner.message.isEmpty()) {
+                        ValgallovDeletedTracker.saveContent(dialogId, id, msg.messageOwner.message, msg.messageOwner.date, msg.isOutOwner());
+                    }
+                } catch (Throwable ignore) {}
+            }
             final long valgallovDialogId = dialogId;
             final ArrayList<Integer> valgallovMarkedIds = new ArrayList<>(ids);
             AndroidUtilities.runOnUIThread(() -> getNotificationCenter().postNotificationName(NotificationCenter.valgallovDeletionMarked, valgallovDialogId, valgallovMarkedIds));
@@ -18064,6 +18073,14 @@ public class MessagesController extends BaseController implements NotificationCe
                         FileLog.d("Valgallov: skipping local delete for " + update.messages.size() + " message(s)");
                     }
                     ValgallovDeletedTracker.markDeleted(0L, update.messages);
+                    for (Integer id : update.messages) {
+                        try {
+                            MessageObject msg = dialogMessagesByIds.get(id);
+                            if (msg != null && msg.messageOwner != null && msg.messageOwner.message != null && !msg.messageOwner.message.isEmpty()) {
+                                ValgallovDeletedTracker.saveContent(msg.getDialogId(), id, msg.messageOwner.message, msg.messageOwner.date, msg.isOutOwner());
+                            }
+                        } catch (Throwable ignore) {}
+                    }
                     final ArrayList<Integer> markedIds = new ArrayList<>(update.messages);
                     AndroidUtilities.runOnUIThread(() -> {
                         getNotificationCenter().postNotificationName(NotificationCenter.valgallovDeletionMarked, 0L, markedIds);
@@ -18600,6 +18617,14 @@ public class MessagesController extends BaseController implements NotificationCe
                     }
                     final long valgallovDialogId = -update.channel_id;
                     ValgallovDeletedTracker.markDeleted(valgallovDialogId, update.messages);
+                    for (Integer id : update.messages) {
+                        try {
+                            MessageObject msg = dialogMessagesByIds.get(id);
+                            if (msg != null && msg.messageOwner != null && msg.messageOwner.message != null && !msg.messageOwner.message.isEmpty()) {
+                                ValgallovDeletedTracker.saveContent(valgallovDialogId, id, msg.messageOwner.message, msg.messageOwner.date, msg.isOutOwner());
+                            }
+                        } catch (Throwable ignore) {}
+                    }
                     final ArrayList<Integer> valgallovMarkedIds = new ArrayList<>(update.messages);
                     AndroidUtilities.runOnUIThread(() -> {
                         getNotificationCenter().postNotificationName(NotificationCenter.valgallovDeletionMarked, valgallovDialogId, valgallovMarkedIds);
