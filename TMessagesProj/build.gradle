@@ -68,6 +68,9 @@ dependencies {
     }
     implementation 'com.google.android.recaptcha:recaptcha:18.7.1'
 
+    // Valgallov: Rhino for JavaScript plugin engine (~1.2 MB). Pure-Java, works on Android.
+    implementation 'org.mozilla:rhino:1.7.15'
+
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
 

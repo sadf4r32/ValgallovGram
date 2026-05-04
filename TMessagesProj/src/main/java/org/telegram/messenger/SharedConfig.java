@@ -233,6 +233,7 @@ public class SharedConfig {
     public static boolean valgallovLanguageEnabled = false;
     public static boolean valgallovHiddenChatsEnabled = false;
     public static boolean valgallovEditHistoryEnabled = true;
+    public static boolean valgallovPluginsEnabled = false;
     // 0=Стали (default), 1=Огня, 2=Льда, 3=Тьмы
     public static int valgallovThemePreset = 0;
     public static boolean valgallovShowSeconds = false;
@@ -647,6 +648,7 @@ public class SharedConfig {
             valgallovLanguageEnabled = preferences.getBoolean("valgallovLanguageEnabled", false);
             valgallovHiddenChatsEnabled = preferences.getBoolean("valgallovHiddenChatsEnabled", false);
             valgallovEditHistoryEnabled = preferences.getBoolean("valgallovEditHistoryEnabled", true);
+            valgallovPluginsEnabled = preferences.getBoolean("valgallovPluginsEnabled", false);
             valgallovThemePreset = preferences.getInt("valgallovThemePreset", 0);
             valgallovShowSeconds = preferences.getBoolean("valgallovShowSeconds", false);
             valgallovAntiScreenRecord = preferences.getBoolean("valgallovAntiScreenRecord", true);
@@ -1229,6 +1231,11 @@ public class SharedConfig {
     public static void toggleValgallovEditHistoryEnabled() {
         valgallovEditHistoryEnabled = !valgallovEditHistoryEnabled;
         MessagesController.getGlobalMainSettings().edit().putBoolean("valgallovEditHistoryEnabled", valgallovEditHistoryEnabled).apply();
+    }
+
+    public static void toggleValgallovPluginsEnabled() {
+        valgallovPluginsEnabled = !valgallovPluginsEnabled;
+        MessagesController.getGlobalMainSettings().edit().putBoolean("valgallovPluginsEnabled", valgallovPluginsEnabled).apply();
     }
 
     public static void setValgallovThemePreset(int preset) {

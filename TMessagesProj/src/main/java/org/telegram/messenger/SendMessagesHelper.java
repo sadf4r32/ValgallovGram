@@ -4023,6 +4023,14 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     public void sendMessage(SendMessageParams sendMessageParams) {
+        // Valgallov: dispatch to JS plugins before sending
+        try {
+            if (SharedConfig.valgallovPluginsEnabled && sendMessageParams != null && sendMessageParams.message != null) {
+                ValgallovPluginManager.dispatchOnSend(sendMessageParams.peer, sendMessageParams.message);
+            }
+        } catch (Throwable ignore) {
+        }
+
         String message = sendMessageParams.message;
         String caption = sendMessageParams.caption;
         TLRPC.MessageMedia location = sendMessageParams.location;

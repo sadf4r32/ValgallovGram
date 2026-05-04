@@ -329,6 +329,12 @@ public class ApplicationLoader extends Application {
         } catch (Throwable ignore) {
         }
 
+        // Valgallov: load JS plugins if the feature is enabled.
+        try {
+            ValgallovPluginManager.initOnce();
+        } catch (Throwable ignore) {
+        }
+
         super.onCreate();
 
         if (BuildVars.LOGS_ENABLED) {

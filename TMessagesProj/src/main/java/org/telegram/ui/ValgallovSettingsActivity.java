@@ -59,6 +59,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int backupRow;
     private int readLaterRow;
     private int deletedHistoryRow;
+    private int pluginsRow;
+    private int pluginsManageRow;
     private int extraInfoRow;
 
     @Override
@@ -96,6 +98,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
         backupRow = rowCount++;
         readLaterRow = rowCount++;
         deletedHistoryRow = rowCount++;
+        pluginsRow = rowCount++;
+        pluginsManageRow = SharedConfig.valgallovPluginsEnabled ? rowCount++ : -1;
         extraInfoRow = rowCount++;
     }
 
@@ -294,6 +298,33 @@ public class ValgallovSettingsActivity extends BaseFragment {
             } else if (position == deletedHistoryRow) {
                 presentFragment(new ValgallovDeletedHistoryActivity(0));
                 return;
+            } else if (position == pluginsRow) {
+                SharedConfig.toggleValgallovPluginsEnabled();
+                newValue = SharedConfig.valgallovPluginsEnabled;
+                changed = true;
+                org.telegram.messenger.ValgallovPluginManager.reload();
+                updateRows();
+                if (listAdapter != null) listAdapter.notifyDataSetChanged();
+            } else if (pluginsManageRow != -1 && position == pluginsManageRow) {
+                // Reload plugins from Downloads/valgallov_plugins/
+                org.telegram.messenger.ValgallovPluginManager.reload();
+                int n = org.telegram.messenger.ValgallovPluginManager.loadedCount();
+                java.util.List<String> names = org.telegram.messenger.ValgallovPluginManager.loadedNames();
+                String msg;
+                if (n == 0) {
+                    msg = "Плагинов не найдено. Скопируй .js файлы в Downloads/valgallov_plugins/";
+                } else {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("Загружено ").append(n).append(": ");
+                    for (int i = 0; i < names.size(); i++) {
+                        if (i > 0) sb.append(", ");
+                        sb.append(names.get(i));
+                    }
+                    msg = sb.toString();
+                }
+                android.widget.Toast.makeText(getParentActivity(), msg, android.widget.Toast.LENGTH_LONG).show();
+                if (listAdapter != null) listAdapter.notifyDataSetChanged();
+                return;
             }
 
             if (changed && view instanceof TextCheckCell) {
@@ -462,7 +493,11 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else if (position == antiScreenRecordRow) {
                         cell.setTextAndValueAndCheck("Детектор записи экрана",
                             "Уведомлять при записи экрана (API 34+)",
-                            SharedConfig.valgallovAntiScreenRecord, false, true);
+                            SharedConfig.valgallovAntiScreenRecord, true, true);
+                    } else if (position == pluginsRow) {
+                        cell.setTextAndValueAndCheck("Плагины (JavaScript)",
+                            "Загружать скрипты из Downloads/valgallov_plugins/",
+                            SharedConfig.valgallovPluginsEnabled, false, true);
                     }
                     break;
                 }
@@ -491,7 +526,11 @@ public class ValgallovSettingsActivity extends BaseFragment {
                             n > 0 ? (n + " сообщ.") : "пусто", true);
                     } else if (position == deletedHistoryRow) {
                         cell.setTextAndValue("Вся история стёртого",
-                            "Удалённые сообщения из всех чатов", false);
+                            "Удалённые сообщения из всех чатов", true);
+                    } else if (pluginsManageRow != -1 && position == pluginsManageRow) {
+                        int n = org.telegram.messenger.ValgallovPluginManager.loadedCount();
+                        cell.setTextAndValue("Перезагрузить плагины",
+                            n == 0 ? "нет .js файлов" : (n + " загружено — нажать чтобы перечитать"), false);
                     }
                     break;
                 }
@@ -513,7 +552,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || (searchHiddenRow != -1 && position == searchHiddenRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || (searchHiddenRow != -1 && position == searchHiddenRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow || (pluginsManageRow != -1 && position == pluginsManageRow)) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;
