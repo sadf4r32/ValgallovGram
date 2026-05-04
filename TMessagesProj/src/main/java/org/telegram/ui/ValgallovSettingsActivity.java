@@ -53,6 +53,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int editHistoryRow;
     private int themePresetRow;
     private int showSecondsRow;
+    private int antiScreenRecordRow;
+    private int quickMuteRow;
     private int deletedHistoryRow;
     private int extraInfoRow;
 
@@ -85,6 +87,8 @@ public class ValgallovSettingsActivity extends BaseFragment {
         editHistoryRow = rowCount++;
         themePresetRow = rowCount++;
         showSecondsRow = rowCount++;
+        antiScreenRecordRow = rowCount++;
+        quickMuteRow = rowCount++;
         deletedHistoryRow = rowCount++;
         extraInfoRow = rowCount++;
     }
@@ -226,6 +230,27 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 SharedConfig.toggleValgallovShowSeconds();
                 newValue = SharedConfig.valgallovShowSeconds;
                 changed = true;
+            } else if (position == antiScreenRecordRow) {
+                SharedConfig.toggleValgallovAntiScreenRecord();
+                newValue = SharedConfig.valgallovAntiScreenRecord;
+                changed = true;
+            } else if (position == quickMuteRow) {
+                // Quick mute all dialogs for 2 hours
+                try {
+                    org.telegram.messenger.MessagesController mc = org.telegram.messenger.MessagesController.getInstance(getCurrentAccount());
+                    java.util.ArrayList<org.telegram.tgnet.TLRPC.Dialog> allDialogs = mc.getAllDialogs();
+                    int count = 0;
+                    for (org.telegram.tgnet.TLRPC.Dialog d : allDialogs) {
+                        if (d == null) continue;
+                        if (mc.isDialogMuted(d.id, 0)) continue;
+                        org.telegram.messenger.NotificationsController.getInstance(getCurrentAccount()).muteDialog(d.id, 0, true);
+                        count++;
+                    }
+                    android.widget.Toast.makeText(getParentActivity(), "Замучено: " + count + " чатов на 2 часа", android.widget.Toast.LENGTH_SHORT).show();
+                } catch (Throwable e) {
+                    android.widget.Toast.makeText(getParentActivity(), "Ошибка: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                }
+                return;
             } else if (position == deletedHistoryRow) {
                 presentFragment(new ValgallovDeletedHistoryActivity(0));
                 return;
@@ -393,7 +418,11 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else if (position == showSecondsRow) {
                         cell.setTextAndValueAndCheck("Секунды в часах",
                             "Показывать HH:MM:SS вместо HH:MM",
-                            SharedConfig.valgallovShowSeconds, false, true);
+                            SharedConfig.valgallovShowSeconds, true, true);
+                    } else if (position == antiScreenRecordRow) {
+                        cell.setTextAndValueAndCheck("Детектор записи экрана",
+                            "Уведомлять при записи экрана (API 34+)",
+                            SharedConfig.valgallovAntiScreenRecord, false, true);
                     }
                     break;
                 }
@@ -406,6 +435,9 @@ public class ValgallovSettingsActivity extends BaseFragment {
                     } else if (position == themePresetRow) {
                         cell.setTextAndValue("Тема Чертога",
                             org.telegram.messenger.ValgallovThemePresets.presetName(SharedConfig.valgallovThemePreset), true);
+                    } else if (position == quickMuteRow) {
+                        cell.setTextAndValue("Замутить все чаты",
+                            "Отключить уведомления для всех диалогов", true);
                     } else if (position == deletedHistoryRow) {
                         cell.setTextAndValue("Вся история стёртого",
                             "Удалённые сообщения из всех чатов", false);
@@ -430,7 +462,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow || position == deletedHistoryRow) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || position == themePresetRow || position == quickMuteRow || position == deletedHistoryRow) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;

@@ -1614,6 +1614,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int chat_menu_topic_create = 73;
 
     private final static int valgallov_deleted_history = 990;
+    private final static int valgallov_echo_export = 991;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -3976,6 +3977,16 @@ public class ChatActivity extends BaseFragment implements
                     openSearchWithText(isSupportedTags() ? "" : null);
                 } else if (id == valgallov_deleted_history) {
                     presentFragment(new ValgallovDeletedHistoryActivity(getDialogId()));
+                } else if (id == valgallov_echo_export) {
+                    String chatName = "chat";
+                    try {
+                        if (currentUser != null) {
+                            chatName = org.telegram.messenger.UserObject.getFirstName(currentUser);
+                        } else if (currentChat != null) {
+                            chatName = currentChat.title;
+                        }
+                    } catch (Throwable ignore) {}
+                    org.telegram.messenger.ValgallovEchoExporter.export(getParentActivity(), getDialogId(), chatName);
                 } else if (id == translate) {
                     getMessagesController().getTranslateController().setHideTranslateDialog(getDialogId(), false, true);
                     if (!getMessagesController().getTranslateController().toggleTranslatingDialog(getDialogId(), true)) {
@@ -4394,6 +4405,7 @@ public class ChatActivity extends BaseFragment implements
             }
             if (org.telegram.messenger.SharedConfig.valgallovShowDeleted) {
                 headerItem.lazilyAddSubItem(valgallov_deleted_history, R.drawable.msg_clear_recent, "История стёртого");
+                headerItem.lazilyAddSubItem(valgallov_echo_export, R.drawable.msg_download, "Сохранить эхо");
             }
             if (ChatObject.isBoostSupported(currentChat) && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, "" + R.raw.boosts, dp(24), dp(24));

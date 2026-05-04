@@ -236,6 +236,7 @@ public class SharedConfig {
     // 0=Стали (default), 1=Огня, 2=Льда, 3=Тьмы
     public static int valgallovThemePreset = 0;
     public static boolean valgallovShowSeconds = false;
+    public static boolean valgallovAntiScreenRecord = true;
 
     public static String directShareHash;
 
@@ -648,6 +649,7 @@ public class SharedConfig {
             valgallovEditHistoryEnabled = preferences.getBoolean("valgallovEditHistoryEnabled", true);
             valgallovThemePreset = preferences.getInt("valgallovThemePreset", 0);
             valgallovShowSeconds = preferences.getBoolean("valgallovShowSeconds", false);
+            valgallovAntiScreenRecord = preferences.getBoolean("valgallovAntiScreenRecord", true);
             if (useSystemBoldFont) {
                 AndroidUtilities.mediumTypeface = null;
             }
@@ -1237,6 +1239,11 @@ public class SharedConfig {
     public static void toggleValgallovShowSeconds() {
         valgallovShowSeconds = !valgallovShowSeconds;
         MessagesController.getGlobalMainSettings().edit().putBoolean("valgallovShowSeconds", valgallovShowSeconds).apply();
+    }
+
+    public static void toggleValgallovAntiScreenRecord() {
+        valgallovAntiScreenRecord = !valgallovAntiScreenRecord;
+        MessagesController.getGlobalMainSettings().edit().putBoolean("valgallovAntiScreenRecord", valgallovAntiScreenRecord).apply();
     }
 
     public static void toggleFastWallpaperDisabled() {

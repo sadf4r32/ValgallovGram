@@ -138,4 +138,14 @@ public final class ValgallovEditTracker {
         }
         return false;
     }
+
+    /** Return all edit versions for a specific dialog, newest first. */
+    public static synchronized ArrayList<Version> getAllVersionsForDialog(long dialogId) {
+        ensureLoaded();
+        ArrayList<Version> list = sCache.get(dialogId);
+        if (list == null) return new ArrayList<>();
+        ArrayList<Version> out = new ArrayList<>(list);
+        Collections.reverse(out);
+        return out;
+    }
 }
