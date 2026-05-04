@@ -108,6 +108,107 @@ public final class ValgallovPluginManager {
         } catch (Throwable ignore) {}
     }
 
+    /** Names of .js files bundled inside the APK under
+     *  assets/valgallov_builtin_plugins/. These can be "installed" with one tap
+     *  without the user having to download anything. */
+    public static List<PluginInfo> listBuiltins() {
+        List<PluginInfo> out = new ArrayList<>();
+        try {
+            android.content.res.AssetManager am = ApplicationLoader.applicationContext.getAssets();
+            String[] names = am.list("valgallov_builtin_plugins");
+            if (names == null) return out;
+            java.util.Arrays.sort(names);
+            for (String n : names) {
+                if (!n.endsWith(".js")) continue;
+                PluginInfo info = parseMetadataFromAsset(am, "valgallov_builtin_plugins/" + n);
+                info.fileName = n;
+                if (info.name == null || info.name.isEmpty()) info.name = n;
+                info.loaded = isLoaded(n);
+                info.enabled = isEnabled(n);
+                // Mark builtins so UI can distinguish them
+                info.description = (info.description == null ? "" : info.description + "  ·  ") + "встроенный";
+                // reuse enabled flag — if file already installed, UI will show same row
+                out.add(info);
+            }
+        } catch (Throwable ignore) {}
+        return out;
+    }
+
+    private static PluginInfo parseMetadataFromAsset(android.content.res.AssetManager am, String path) {
+        PluginInfo info = new PluginInfo();
+        try (BufferedReader br = new BufferedReader(new java.io.InputStreamReader(am.open(path)))) {
+            String line;
+            int scanned = 0;
+            while ((line = br.readLine()) != null && scanned < 40) {
+                scanned++;
+                String t = line.trim();
+                if (!t.startsWith("//")) {
+                    if (scanned > 5 && !t.isEmpty()) break;
+                    continue;
+                }
+                t = t.substring(2).trim();
+                int at = t.indexOf('@');
+                if (at < 0) continue;
+                String rest = t.substring(at + 1).trim();
+                int sp = rest.indexOf(' ');
+                if (sp < 0) sp = rest.indexOf('\t');
+                if (sp < 0) continue;
+                String key = rest.substring(0, sp).toLowerCase();
+                String val = rest.substring(sp + 1).trim();
+                if ("name".equals(key)) info.name = val;
+                else if ("author".equals(key)) info.author = val;
+                else if ("version".equals(key)) info.version = val;
+                else if ("description".equals(key)) info.description = val;
+            }
+        } catch (Throwable ignore) {}
+        return info;
+    }
+
+    /** Copies a bundled plugin out of assets into the plugin dir so it gets loaded. */
+    public static boolean installBuiltin(String fileName) {
+        try {
+            android.content.res.AssetManager am = ApplicationLoader.applicationContext.getAssets();
+            File out = new File(pluginDir(), fileName);
+            try (java.io.InputStream in = am.open("valgallov_builtin_plugins/" + fileName);
+                 java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) fo.write(buf, 0, n);
+            }
+            setEnabled(fileName, true);
+            return true;
+        } catch (Throwable t) {
+            if (BuildVars.LOGS_ENABLED) FileLog.e(t);
+            return false;
+        }
+    }
+
+    /** Copies an arbitrary input stream into the plugin dir under the given name.
+     *  Used by the "tap a .js file → install" intent handler. */
+    public static boolean installFromStream(String fileName, java.io.InputStream in) {
+        if (fileName == null || in == null) return false;
+        if (!fileName.endsWith(".js")) fileName = fileName + ".js";
+        try {
+            File out = new File(pluginDir(), fileName);
+            try (java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) fo.write(buf, 0, n);
+            }
+            setEnabled(fileName, true);
+            return true;
+        } catch (Throwable t) {
+            if (BuildVars.LOGS_ENABLED) FileLog.e(t);
+            return false;
+        }
+    }
+
+    public static boolean isInstalled(String fileName) {
+        return new File(pluginDir(), fileName).isFile();
+    }
+
+    public static File pluginDirPublic() { return pluginDir(); }
+
     public static boolean delete(String fileName) {
         File f = new File(pluginDir(), fileName);
         boolean ok = false;

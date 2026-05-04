@@ -44,7 +44,8 @@ public class ValgallovPluginsActivity extends BaseFragment {
     private RecyclerView listView;
     private Adapter adapter;
     private TextView emptyView;
-    private final List<ValgallovPluginManager.PluginInfo> plugins = new ArrayList<>();
+    private final List<ValgallovPluginManager.PluginInfo> installed = new ArrayList<>();
+    private final List<ValgallovPluginManager.PluginInfo> builtins = new ArrayList<>();
 
     @Override
     public boolean onFragmentCreate() {
@@ -110,11 +111,16 @@ public class ValgallovPluginsActivity extends BaseFragment {
                 "Перезагружено: " + ValgallovPluginManager.loadedCount() + " активных",
                 Toast.LENGTH_SHORT).show();
         }
-        plugins.clear();
-        plugins.addAll(ValgallovPluginManager.listAll());
+        installed.clear();
+        installed.addAll(ValgallovPluginManager.listAll());
+        builtins.clear();
+        // only show builtins that are not already installed
+        for (ValgallovPluginManager.PluginInfo b : ValgallovPluginManager.listBuiltins()) {
+            if (!ValgallovPluginManager.isInstalled(b.fileName)) builtins.add(b);
+        }
         if (adapter != null) adapter.notifyDataSetChanged();
         if (emptyView != null) {
-            emptyView.setVisibility(plugins.isEmpty() ? View.VISIBLE : View.GONE);
+            emptyView.setVisibility(installed.isEmpty() && builtins.isEmpty() ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -126,22 +132,74 @@ public class ValgallovPluginsActivity extends BaseFragment {
 
     // ------------ Adapter ------------
 
-    private class Adapter extends RecyclerView.Adapter<Adapter.Holder> {
+    private static final int TYPE_HEADER = 0;
+    private static final int TYPE_INSTALLED = 1;
+    private static final int TYPE_BUILTIN = 2;
 
-        @NonNull
-        @Override
-        public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new Holder(parent.getContext());
+    private class Adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+        // Layout:  [header "Установлено"]  [installed...]  [header "Встроенные"]  [builtins...]
+        //  — if installed empty: first header becomes the builtins one (no double "empty" sections)
+
+        private int headerInstalledPos() { return installed.isEmpty() ? -1 : 0; }
+        private int headerBuiltinsPos()  {
+            if (builtins.isEmpty()) return -1;
+            return installed.isEmpty() ? 0 : 1 + installed.size();
         }
 
         @Override
-        public void onBindViewHolder(@NonNull Holder holder, int position) {
-            holder.bind(plugins.get(position));
+        public int getItemViewType(int position) {
+            int hi = headerInstalledPos();
+            int hb = headerBuiltinsPos();
+            if (position == hi || position == hb) return TYPE_HEADER;
+            if (hi == 0 && position > 0 && position <= installed.size()) return TYPE_INSTALLED;
+            return TYPE_BUILTIN;
+        }
+
+        @NonNull
+        @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            Context ctx = parent.getContext();
+            if (viewType == TYPE_HEADER) return new HeaderHolder(ctx);
+            return new Holder(ctx);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+            int hi = headerInstalledPos();
+            int hb = headerBuiltinsPos();
+            if (position == hi) { ((HeaderHolder) holder).label.setText("УСТАНОВЛЕНО"); return; }
+            if (position == hb) { ((HeaderHolder) holder).label.setText("ВСТРОЕННЫЕ"); return; }
+            if (hi == 0 && position > 0 && position <= installed.size()) {
+                ((Holder) holder).bindInstalled(installed.get(position - 1));
+            } else {
+                int idxBase = (hb >= 0) ? hb + 1 : 0;
+                ((Holder) holder).bindBuiltin(builtins.get(position - idxBase));
+            }
         }
 
         @Override
         public int getItemCount() {
-            return plugins.size();
+            int n = 0;
+            if (!installed.isEmpty()) n += 1 + installed.size();
+            if (!builtins.isEmpty())  n += 1 + builtins.size();
+            return n;
+        }
+
+        class HeaderHolder extends RecyclerView.ViewHolder {
+            final TextView label;
+            HeaderHolder(Context ctx) {
+                super(new TextView(ctx));
+                label = (TextView) itemView;
+                label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+                label.setTextSize(12);
+                label.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
+                int h = AndroidUtilities.dp(16);
+                label.setPadding(h, AndroidUtilities.dp(18), h, AndroidUtilities.dp(8));
+                label.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+                label.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
         }
 
         class Holder extends RecyclerView.ViewHolder {
@@ -164,7 +222,7 @@ public class ValgallovPluginsActivity extends BaseFragment {
                 deleteButton = (TextView) btnRow.getChildAt(1);
             }
 
-            void bind(final ValgallovPluginManager.PluginInfo p) {
+            private void fillMeta(ValgallovPluginManager.PluginInfo p, String statusOverride) {
                 titleView.setText(p.name);
                 String subtitle = p.fileName;
                 if (p.description != null && !p.description.isEmpty()) {
@@ -177,23 +235,33 @@ public class ValgallovPluginsActivity extends BaseFragment {
                     if (meta.length() > 0) meta.append("  ·  ");
                     meta.append("v").append(p.version);
                 }
-                meta.append(meta.length() > 0 ? "  ·  " : "")
-                    .append(Math.max(1, p.sizeBytes / 1024)).append(" КБ");
-                meta.append("  ·  ").append(p.loaded ? "загружен" : (p.enabled ? "выключен глобально" : "отключён"));
+                if (p.sizeBytes > 0) {
+                    if (meta.length() > 0) meta.append("  ·  ");
+                    meta.append(Math.max(1, p.sizeBytes / 1024)).append(" КБ");
+                }
+                if (statusOverride != null) {
+                    if (meta.length() > 0) meta.append("  ·  ");
+                    meta.append(statusOverride);
+                }
                 metaView.setText(meta.toString());
+            }
+
+            void bindInstalled(final ValgallovPluginManager.PluginInfo p) {
+                String status = p.loaded ? "загружен" : (p.enabled ? "выключен глобально" : "отключён");
+                fillMeta(p, status);
 
                 boolean on = p.enabled;
                 toggleButton.setText(on ? "Выключить" : "Включить");
                 toggleButton.setTextColor(on ? 0xFFC04A3E : 0xFF3F9D5E);
                 toggleButton.setOnClickListener(v -> {
                     ValgallovPluginManager.setEnabled(p.fileName, !on);
-                    // If globally enabled, reload engine to pick up change immediately
-                    if (SharedConfig.valgallovPluginsEnabled) {
-                        ValgallovPluginManager.reload();
-                    }
+                    if (SharedConfig.valgallovPluginsEnabled) ValgallovPluginManager.reload();
                     refresh(false);
                 });
 
+                deleteButton.setVisibility(View.VISIBLE);
+                deleteButton.setText("Удалить");
+                deleteButton.setTextColor(0xFFC04A3E);
                 deleteButton.setOnClickListener(v -> {
                     AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
                     b.setTitle("Удалить " + p.fileName + "?");
@@ -203,9 +271,7 @@ public class ValgallovPluginsActivity extends BaseFragment {
                         Toast.makeText(getParentActivity(),
                             ok ? "Удалено: " + p.fileName : "Не удалось удалить",
                             Toast.LENGTH_SHORT).show();
-                        if (SharedConfig.valgallovPluginsEnabled) {
-                            ValgallovPluginManager.reload();
-                        }
+                        if (SharedConfig.valgallovPluginsEnabled) ValgallovPluginManager.reload();
                         refresh(false);
                     });
                     b.setNegativeButton("Отмена", null);
@@ -213,6 +279,22 @@ public class ValgallovPluginsActivity extends BaseFragment {
                 });
             }
 
+            void bindBuiltin(final ValgallovPluginManager.PluginInfo p) {
+                fillMeta(p, "встроенный — не установлен");
+
+                toggleButton.setText("Установить");
+                toggleButton.setTextColor(0xFF3F9D5E);
+                toggleButton.setOnClickListener(v -> {
+                    boolean ok = ValgallovPluginManager.installBuiltin(p.fileName);
+                    Toast.makeText(getParentActivity(),
+                        ok ? "Установлено: " + p.fileName : "Не удалось установить",
+                        Toast.LENGTH_SHORT).show();
+                    if (ok && SharedConfig.valgallovPluginsEnabled) ValgallovPluginManager.reload();
+                    refresh(false);
+                });
+
+                deleteButton.setVisibility(View.GONE);
+            }
         }
     }
 
