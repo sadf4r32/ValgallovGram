@@ -16858,8 +16858,15 @@ public class MessagesController extends BaseController implements NotificationCe
             for (Integer id : ids) {
                 try {
                     MessageObject msg = dialogMessagesByIds.get(id);
-                    if (msg != null && msg.messageOwner != null && msg.messageOwner.message != null && !msg.messageOwner.message.isEmpty()) {
-                        ValgallovDeletedTracker.saveContent(dialogId, id, msg.messageOwner.message, msg.messageOwner.date, msg.isOutOwner());
+                    if (msg != null && msg.messageOwner != null) {
+                        String text = msg.messageOwner.message;
+                        String mediaType = getValgallovMediaType(msg);
+                        if ((text == null || text.isEmpty()) && mediaType != null) text = "[" + mediaType + "]";
+                        if (text != null && !text.isEmpty()) {
+                            String sName = getValgallovSenderName(msg);
+                            long sId = getValgallovSenderId(msg);
+                            ValgallovDeletedTracker.saveContent(dialogId, id, text, msg.messageOwner.date, msg.isOutOwner(), sName, sId, mediaType);
+                        }
                     }
                 } catch (Throwable ignore) {}
             }
@@ -18076,8 +18083,15 @@ public class MessagesController extends BaseController implements NotificationCe
                     for (Integer id : update.messages) {
                         try {
                             MessageObject msg = dialogMessagesByIds.get(id);
-                            if (msg != null && msg.messageOwner != null && msg.messageOwner.message != null && !msg.messageOwner.message.isEmpty()) {
-                                ValgallovDeletedTracker.saveContent(msg.getDialogId(), id, msg.messageOwner.message, msg.messageOwner.date, msg.isOutOwner());
+                            if (msg != null && msg.messageOwner != null) {
+                                String text = msg.messageOwner.message;
+                                String mediaType = getValgallovMediaType(msg);
+                                if ((text == null || text.isEmpty()) && mediaType != null) text = "[" + mediaType + "]";
+                                if (text != null && !text.isEmpty()) {
+                                    String sName = getValgallovSenderName(msg);
+                                    long sId = getValgallovSenderId(msg);
+                                    ValgallovDeletedTracker.saveContent(msg.getDialogId(), id, text, msg.messageOwner.date, msg.isOutOwner(), sName, sId, mediaType);
+                                }
                             }
                         } catch (Throwable ignore) {}
                     }
@@ -18620,8 +18634,15 @@ public class MessagesController extends BaseController implements NotificationCe
                     for (Integer id : update.messages) {
                         try {
                             MessageObject msg = dialogMessagesByIds.get(id);
-                            if (msg != null && msg.messageOwner != null && msg.messageOwner.message != null && !msg.messageOwner.message.isEmpty()) {
-                                ValgallovDeletedTracker.saveContent(valgallovDialogId, id, msg.messageOwner.message, msg.messageOwner.date, msg.isOutOwner());
+                            if (msg != null && msg.messageOwner != null) {
+                                String text = msg.messageOwner.message;
+                                String mediaType = getValgallovMediaType(msg);
+                                if ((text == null || text.isEmpty()) && mediaType != null) text = "[" + mediaType + "]";
+                                if (text != null && !text.isEmpty()) {
+                                    String sName = getValgallovSenderName(msg);
+                                    long sId = getValgallovSenderId(msg);
+                                    ValgallovDeletedTracker.saveContent(valgallovDialogId, id, text, msg.messageOwner.date, msg.isOutOwner(), sName, sId, mediaType);
+                                }
                             }
                         } catch (Throwable ignore) {}
                     }
@@ -24138,5 +24159,50 @@ public class MessagesController extends BaseController implements NotificationCe
             }
             loadingStakeDiceInfo = null;
         });
+    }
+
+    // --- Valgallov helper methods for deleted message tracking ---
+
+    private String getValgallovMediaType(MessageObject msg) {
+        if (msg == null) return null;
+        try {
+            if (msg.isSticker() || msg.isAnimatedSticker()) return "sticker";
+            if (msg.isPhoto()) return "photo";
+            if (msg.isVideo()) return "video";
+            if (msg.isVoice()) return "voice";
+            if (msg.isRoundVideo()) return "video_note";
+            if (msg.isGif()) return "gif";
+            if (msg.isDocument()) return "document";
+        } catch (Throwable ignore) {}
+        return null;
+    }
+
+    private String getValgallovSenderName(MessageObject msg) {
+        if (msg == null || msg.messageOwner == null) return null;
+        try {
+            long senderId = getValgallovSenderId(msg);
+            if (senderId > 0) {
+                TLRPC.User u = getUser(senderId);
+                if (u != null) {
+                    String fn = u.first_name != null ? u.first_name : "";
+                    String ln = u.last_name != null ? u.last_name : "";
+                    return (fn + " " + ln).trim();
+                }
+            } else if (senderId < 0) {
+                TLRPC.Chat c = getChat(-senderId);
+                if (c != null) return c.title;
+            }
+        } catch (Throwable ignore) {}
+        return null;
+    }
+
+    private long getValgallovSenderId(MessageObject msg) {
+        if (msg == null || msg.messageOwner == null) return 0;
+        try {
+            if (msg.messageOwner.from_id != null) {
+                return DialogObject.getPeerDialogId(msg.messageOwner.from_id);
+            }
+        } catch (Throwable ignore) {}
+        return 0;
     }
 }

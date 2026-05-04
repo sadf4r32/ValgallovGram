@@ -28,24 +28,31 @@ public class ValgallovDeletedTracker {
         public final String text;
         public final int date;
         public final boolean outgoing;
+        public final String senderName;
+        public final long senderId;
+        public final String mediaType; // null, "sticker", "photo", "video", "voice", "video_note", "gif", "document"
 
-        public DeletedMessage(long dialogId, int msgId, String text, int date, boolean outgoing) {
+        public DeletedMessage(long dialogId, int msgId, String text, int date, boolean outgoing,
+                             String senderName, long senderId, String mediaType) {
             this.dialogId = dialogId;
             this.msgId = msgId;
             this.text = text;
             this.date = date;
             this.outgoing = outgoing;
+            this.senderName = senderName;
+            this.senderId = senderId;
+            this.mediaType = mediaType;
         }
     }
 
     private static final String PREFS_NAME = "valgallov_deleted_v2";
-    private static final String CONTENT_PREFS = "valgallov_deleted_content_v1";
+    private static final String CONTENT_PREFS = "valgallov_deleted_content_v2";
     private static final int MAX_PER_DIALOG = 5000;
 
     /** Right-side suffix for deleted messages (Norse rune Hagalaz). */
     private static final String SUFFIX = "  ᚺ";
-    /** Faded steel-blue used for the rune marker — matches the icon palette. */
-    private static final int MARKER_COLOR = 0xFF7A8AA0;
+    /** Red color for the deletion rune marker. */
+    private static final int MARKER_COLOR = 0xFFD44040;
     /** Tone for the message body when deleted (faded grey-blue, italic). */
     private static final int BODY_COLOR = 0xFF8995A6;
 
@@ -208,11 +215,23 @@ public class ValgallovDeletedTracker {
 
     /** Save the actual content of a deleted message. */
     public static void saveContent(long dialogId, int msgId, String text, int date, boolean outgoing) {
-        if (text == null || text.isEmpty()) return;
+        saveContent(dialogId, msgId, text, date, outgoing, null, 0, null);
+    }
+
+    /** Save the actual content of a deleted message with sender info and media type. */
+    public static void saveContent(long dialogId, int msgId, String text, int date, boolean outgoing,
+                                   String senderName, long senderId, String mediaType) {
         try {
-            String sanitized = text.replace(FIELD_SEP, ' ').replace(RECORD_SEP, ' ');
-            // Format: date|outgoing|text
-            String value = date + String.valueOf(FIELD_SEP) + (outgoing ? "1" : "0") + FIELD_SEP + sanitized;
+            String sanitized = (text != null ? text : "").replace(FIELD_SEP, ' ').replace(RECORD_SEP, ' ');
+            String sName = (senderName != null ? senderName : "").replace(FIELD_SEP, ' ').replace(RECORD_SEP, ' ');
+            String mType = mediaType != null ? mediaType : "";
+            // Format: date|outgoing|senderId|senderName|mediaType|text
+            String value = date + String.valueOf(FIELD_SEP)
+                + (outgoing ? "1" : "0") + FIELD_SEP
+                + senderId + FIELD_SEP
+                + sName + FIELD_SEP
+                + mType + FIELD_SEP
+                + sanitized;
             getContentPrefs().edit().putString(dialogId + ":" + msgId, value).apply();
         } catch (Throwable ignore) {}
     }
@@ -234,12 +253,21 @@ public class ValgallovDeletedTracker {
     }
 
     private static DeletedMessage parseContentValue(long dialogId, int msgId, String val) {
-        String[] parts = val.split(String.valueOf(FIELD_SEP), 3);
+        String[] parts = val.split(String.valueOf(FIELD_SEP), 6);
         if (parts.length < 3) return null;
         int date = 0;
         try { date = Integer.parseInt(parts[0]); } catch (Throwable ignore) {}
         boolean out = "1".equals(parts[1]);
-        return new DeletedMessage(dialogId, msgId, parts[2], date, out);
+        // v2 format: date|out|senderId|senderName|mediaType|text
+        if (parts.length >= 6) {
+            long senderId = 0;
+            try { senderId = Long.parseLong(parts[2]); } catch (Throwable ignore) {}
+            String senderName = parts[3].isEmpty() ? null : parts[3];
+            String mediaType = parts[4].isEmpty() ? null : parts[4];
+            return new DeletedMessage(dialogId, msgId, parts[5], date, out, senderName, senderId, mediaType);
+        }
+        // v1 fallback: date|out|text
+        return new DeletedMessage(dialogId, msgId, parts[2], date, out, null, 0, null);
     }
 
     /** Get all deleted messages with saved content for a dialog. Returns newest first. */

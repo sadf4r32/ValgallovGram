@@ -21818,9 +21818,41 @@ public class ChatActivity extends BaseFragment implements
                             if (text == null || text.isEmpty()) {
                                 text = msg.messageText != null ? msg.messageText.toString() : null;
                             }
+                            // Determine media type
+                            String mediaType = null;
+                            if (msg.isSticker() || msg.isAnimatedSticker()) mediaType = "sticker";
+                            else if (msg.isPhoto()) mediaType = "photo";
+                            else if (msg.isVideo()) mediaType = "video";
+                            else if (msg.isVoice()) mediaType = "voice";
+                            else if (msg.isRoundVideo()) mediaType = "video_note";
+                            else if (msg.isGif()) mediaType = "gif";
+                            else if (msg.isDocument()) mediaType = "document";
+                            // Get sender name
+                            String senderName = null;
+                            long senderId = 0;
+                            try {
+                                if (msg.messageOwner.from_id != null) {
+                                    senderId = org.telegram.messenger.DialogObject.getPeerDialogId(msg.messageOwner.from_id);
+                                }
+                                if (senderId > 0) {
+                                    org.telegram.tgnet.TLRPC.User u = getMessagesController().getUser(senderId);
+                                    if (u != null) {
+                                        String fn = u.first_name != null ? u.first_name : "";
+                                        String ln = u.last_name != null ? u.last_name : "";
+                                        senderName = (fn + " " + ln).trim();
+                                    }
+                                } else if (senderId < 0) {
+                                    org.telegram.tgnet.TLRPC.Chat c = getMessagesController().getChat(-senderId);
+                                    if (c != null) senderName = c.title;
+                                }
+                            } catch (Throwable ignore2) {}
+                            // For stickers/media without text, provide a description
+                            if ((text == null || text.isEmpty()) && mediaType != null) {
+                                text = "[" + mediaType + "]";
+                            }
                             if (text != null && !text.isEmpty()) {
                                 long saveDid = markedDialogId != 0 ? markedDialogId : dialog_id;
-                                org.telegram.messenger.ValgallovDeletedTracker.saveContent(saveDid, msg.messageOwner.id, text, msg.messageOwner.date, msg.isOutOwner());
+                                org.telegram.messenger.ValgallovDeletedTracker.saveContent(saveDid, msg.messageOwner.id, text, msg.messageOwner.date, msg.isOutOwner(), senderName, senderId, mediaType);
                             }
                         } catch (Throwable ignore) {}
                         try {
