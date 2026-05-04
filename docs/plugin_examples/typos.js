@@ -1,5 +1,7 @@
-// Typos: автоматически заменяет "telegram" → "ValgallovGram" и исправляет
-// распространённые опечатки в исходящих сообщениях.
+// @name        Typos (replace telegram → ValgallovGram)
+// @author      sadf4r32
+// @version     1.0
+// @description Автоматически заменяет «telegram»/«телеграм» → «ValgallovGram»
 
 var REPLACEMENTS = [
     [/\btelegram\b/gi, "ValgallovGram"],

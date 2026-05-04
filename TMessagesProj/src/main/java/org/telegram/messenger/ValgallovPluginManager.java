@@ -64,6 +64,116 @@ public final class ValgallovPluginManager {
         return out;
     }
 
+    /** Returns metadata for every .js file discovered in the plugins directory,
+     *  whether or not it is currently loaded/enabled. Plugins appear even when
+     *  globally disabled — the UI uses this to populate the manager. */
+    public static List<PluginInfo> listAll() {
+        List<PluginInfo> out = new ArrayList<>();
+        File dir = pluginDir();
+        if (dir == null || !dir.isDirectory()) return out;
+        File[] files = dir.listFiles();
+        if (files == null) return out;
+        java.util.Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        for (File f : files) {
+            if (!f.isFile()) continue;
+            if (!f.getName().endsWith(".js")) continue;
+            PluginInfo info = parseMetadata(f);
+            info.enabled = isEnabled(info.fileName);
+            info.loaded = isLoaded(info.fileName);
+            out.add(info);
+        }
+        return out;
+    }
+
+    public static boolean isLoaded(String fileName) {
+        for (PluginHolder h : PLUGINS) if (h.fileName.equals(fileName)) return true;
+        return false;
+    }
+
+    public static boolean isEnabled(String fileName) {
+        try {
+            return ApplicationLoader.applicationContext
+                .getSharedPreferences("valgallov_plugins", Context.MODE_PRIVATE)
+                .getBoolean("enabled_" + fileName, true);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    public static void setEnabled(String fileName, boolean enabled) {
+        try {
+            ApplicationLoader.applicationContext
+                .getSharedPreferences("valgallov_plugins", Context.MODE_PRIVATE)
+                .edit().putBoolean("enabled_" + fileName, enabled).apply();
+        } catch (Throwable ignore) {}
+    }
+
+    public static boolean delete(String fileName) {
+        File f = new File(pluginDir(), fileName);
+        boolean ok = false;
+        try { ok = f.delete(); } catch (Throwable ignore) {}
+        if (ok) {
+            try {
+                ApplicationLoader.applicationContext
+                    .getSharedPreferences("valgallov_plugins", Context.MODE_PRIVATE)
+                    .edit().remove("enabled_" + fileName).apply();
+            } catch (Throwable ignore) {}
+        }
+        return ok;
+    }
+
+    /** Parse UserScript-style metadata from a plugin file header, e.g.:
+     *    // @name    My plugin
+     *    // @author  sadf4r32
+     *    // @version 1.0
+     *    // @description Short line
+     */
+    private static PluginInfo parseMetadata(File f) {
+        PluginInfo info = new PluginInfo();
+        info.fileName = f.getName();
+        info.sizeBytes = f.length();
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            String line;
+            int scanned = 0;
+            while ((line = br.readLine()) != null && scanned < 40) {
+                scanned++;
+                String t = line.trim();
+                if (!t.startsWith("//")) {
+                    // stop scanning once we fall out of the leading comment block,
+                    // but only after at least a few lines so blank lines are tolerated.
+                    if (scanned > 5 && !t.isEmpty()) break;
+                    continue;
+                }
+                t = t.substring(2).trim();
+                int at = t.indexOf('@');
+                if (at < 0) continue;
+                String rest = t.substring(at + 1).trim();
+                int sp = rest.indexOf(' ');
+                if (sp < 0) sp = rest.indexOf('\t');
+                if (sp < 0) continue;
+                String key = rest.substring(0, sp).toLowerCase();
+                String val = rest.substring(sp + 1).trim();
+                if ("name".equals(key)) info.name = val;
+                else if ("author".equals(key)) info.author = val;
+                else if ("version".equals(key)) info.version = val;
+                else if ("description".equals(key)) info.description = val;
+            }
+        } catch (Throwable ignore) {}
+        if (info.name == null || info.name.isEmpty()) info.name = info.fileName;
+        return info;
+    }
+
+    public static final class PluginInfo {
+        public String fileName;
+        public String name;
+        public String author;
+        public String version;
+        public String description;
+        public long sizeBytes;
+        public boolean enabled;
+        public boolean loaded;
+    }
+
     public static void initOnce() {
         if (initialized) return;
         synchronized (LOCK) {
@@ -111,6 +221,7 @@ public final class ValgallovPluginManager {
             if (!file.isFile()) continue;
             String name = file.getName();
             if (!name.endsWith(".js")) continue;
+            if (!isEnabled(name)) continue;   // per-plugin disable
             PluginHolder h = loadOne(file);
             if (h != null) PLUGINS.add(h);
         }
@@ -385,6 +496,133 @@ public final class ValgallovPluginManager {
 
         public PluginStorage getStorage() {
             return STORAGE;
+        }
+
+        // ----- Unicode text transformers (Valgallov.text.*) -----
+        public TextHelpers getText() {
+            return TEXT_HELPERS;
+        }
+    }
+
+    private static final TextHelpers TEXT_HELPERS = new TextHelpers();
+
+    /**
+     * Pure Unicode-remapping helpers — no entities, useful for plugins that
+     * want to transform text in-place via onSend's return value.
+     */
+    public static final class TextHelpers {
+        // Mathematical Alphanumeric Symbols block. Not every font renders them,
+        // but Telegram Android does. Works for ASCII a-z, A-Z, 0-9 only.
+        public String bold(String s)   { return mapAZaz09(s, 0x1D400, 0x1D41A, 0x1D7CE); }
+        public String italic(String s) { return mapAZaz09(s, 0x1D434, 0x1D44E, -1); }
+        public String mono(String s)   { return mapAZaz09(s, 0x1D670, 0x1D68A, 0x1D7F6); }
+        public String serif(String s)  { return s; /* the input is already serif-ish */ }
+
+        public String strike(String s) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder(s.length() * 2);
+            for (int i = 0; i < s.length(); i++) { sb.append(s.charAt(i)); sb.append('\u0336'); }
+            return sb.toString();
+        }
+
+        public String underline(String s) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder(s.length() * 2);
+            for (int i = 0; i < s.length(); i++) { sb.append(s.charAt(i)); sb.append('\u0332'); }
+            return sb.toString();
+        }
+
+        public String caps(String s) {
+            return s == null ? "" : s.toUpperCase();
+        }
+
+        public String alt(String s) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder(s.length());
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                sb.append((i & 1) == 0 ? Character.toLowerCase(c) : Character.toUpperCase(c));
+            }
+            return sb.toString();
+        }
+
+        public String mock(String s) {
+            if (s == null) return "";
+            java.util.Random r = new java.util.Random();
+            StringBuilder sb = new StringBuilder(s.length());
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                sb.append(r.nextBoolean() ? Character.toLowerCase(c) : Character.toUpperCase(c));
+            }
+            return sb.toString();
+        }
+
+        public String reverse(String s) {
+            if (s == null) return "";
+            return new StringBuilder(s).reverse().toString();
+        }
+
+        public String space(String s) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder(s.length() * 2);
+            for (int i = 0; i < s.length(); i++) {
+                if (i > 0) sb.append(' ');
+                sb.append(s.charAt(i));
+            }
+            return sb.toString();
+        }
+
+        // Cyrillic → Latin transliteration (ГОСТ-ish)
+        public String translit(String s) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder(s.length());
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                String m = translitChar(c);
+                sb.append(m != null ? m : String.valueOf(c));
+            }
+            return sb.toString();
+        }
+
+        private static String mapAZaz09(String s, int baseUpper, int baseLower, int baseDigit) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder(s.length() * 2);
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                if (c >= 'A' && c <= 'Z') sb.appendCodePoint(baseUpper + (c - 'A'));
+                else if (c >= 'a' && c <= 'z') sb.appendCodePoint(baseLower + (c - 'a'));
+                else if (baseDigit > 0 && c >= '0' && c <= '9') sb.appendCodePoint(baseDigit + (c - '0'));
+                else sb.append(c);
+            }
+            return sb.toString();
+        }
+
+        private static String translitChar(char c) {
+            switch (c) {
+                case 'а': return "a"; case 'б': return "b"; case 'в': return "v";
+                case 'г': return "g"; case 'д': return "d"; case 'е': return "e";
+                case 'ё': return "yo"; case 'ж': return "zh"; case 'з': return "z";
+                case 'и': return "i"; case 'й': return "y"; case 'к': return "k";
+                case 'л': return "l"; case 'м': return "m"; case 'н': return "n";
+                case 'о': return "o"; case 'п': return "p"; case 'р': return "r";
+                case 'с': return "s"; case 'т': return "t"; case 'у': return "u";
+                case 'ф': return "f"; case 'х': return "h"; case 'ц': return "ts";
+                case 'ч': return "ch"; case 'ш': return "sh"; case 'щ': return "sch";
+                case 'ъ': return ""; case 'ы': return "y"; case 'ь': return "";
+                case 'э': return "e"; case 'ю': return "yu"; case 'я': return "ya";
+                case 'А': return "A"; case 'Б': return "B"; case 'В': return "V";
+                case 'Г': return "G"; case 'Д': return "D"; case 'Е': return "E";
+                case 'Ё': return "Yo"; case 'Ж': return "Zh"; case 'З': return "Z";
+                case 'И': return "I"; case 'Й': return "Y"; case 'К': return "K";
+                case 'Л': return "L"; case 'М': return "M"; case 'Н': return "N";
+                case 'О': return "O"; case 'П': return "P"; case 'Р': return "R";
+                case 'С': return "S"; case 'Т': return "T"; case 'У': return "U";
+                case 'Ф': return "F"; case 'Х': return "H"; case 'Ц': return "Ts";
+                case 'Ч': return "Ch"; case 'Ш': return "Sh"; case 'Щ': return "Sch";
+                case 'Ъ': return ""; case 'Ы': return "Y"; case 'Ь': return "";
+                case 'Э': return "E"; case 'Ю': return "Yu"; case 'Я': return "Ya";
+                default: return null;
+            }
         }
     }
 

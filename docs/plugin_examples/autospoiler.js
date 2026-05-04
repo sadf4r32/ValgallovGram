@@ -1,13 +1,14 @@
-// Auto-spoiler: всё что ты отправляешь автоматически становится спойлером.
-// Отменяет оригинальную отправку, заменяет её на спойлер-версию с теми же буквами.
+// @name        Auto-spoiler
+// @author      sadf4r32
+// @version     1.0
+// @description Всё что ты пишешь превращается в ||спойлер|| (кроме команд бота)
 
 function onLoad() {
-    Valgallov.toast("Плагин autospoiler активирован");
+    Valgallov.toast("autospoiler активирован");
 }
 
 function onSend(dialogId, text) {
-    // не трогаем команды бота
-    if (text.charAt(0) === '/') return null;
+    if (!text || text.charAt(0) === '/') return null;
     Valgallov.sendSpoiler(dialogId, text);
     return Valgallov.CANCEL;
 }

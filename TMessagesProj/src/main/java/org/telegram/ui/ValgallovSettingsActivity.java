@@ -61,6 +61,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
     private int deletedHistoryRow;
     private int pluginsRow;
     private int pluginsManageRow;
+    private int performerRow;
     private int extraInfoRow;
 
     @Override
@@ -100,6 +101,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
         deletedHistoryRow = rowCount++;
         pluginsRow = rowCount++;
         pluginsManageRow = SharedConfig.valgallovPluginsEnabled ? rowCount++ : -1;
+        performerRow = rowCount++;
         extraInfoRow = rowCount++;
     }
 
@@ -306,24 +308,10 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 updateRows();
                 if (listAdapter != null) listAdapter.notifyDataSetChanged();
             } else if (pluginsManageRow != -1 && position == pluginsManageRow) {
-                // Reload plugins from Downloads/valgallov_plugins/
-                org.telegram.messenger.ValgallovPluginManager.reload();
-                int n = org.telegram.messenger.ValgallovPluginManager.loadedCount();
-                java.util.List<String> names = org.telegram.messenger.ValgallovPluginManager.loadedNames();
-                String msg;
-                if (n == 0) {
-                    msg = "Плагинов не найдено. Скопируй .js файлы в Downloads/valgallov_plugins/";
-                } else {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("Загружено ").append(n).append(": ");
-                    for (int i = 0; i < names.size(); i++) {
-                        if (i > 0) sb.append(", ");
-                        sb.append(names.get(i));
-                    }
-                    msg = sb.toString();
-                }
-                android.widget.Toast.makeText(getParentActivity(), msg, android.widget.Toast.LENGTH_LONG).show();
-                if (listAdapter != null) listAdapter.notifyDataSetChanged();
+                presentFragment(new ValgallovPluginsActivity());
+                return;
+            } else if (position == performerRow) {
+                presentFragment(new ValgallovPerformerActivity());
                 return;
             }
 
@@ -529,8 +517,13 @@ public class ValgallovSettingsActivity extends BaseFragment {
                             "Удалённые сообщения из всех чатов", true);
                     } else if (pluginsManageRow != -1 && position == pluginsManageRow) {
                         int n = org.telegram.messenger.ValgallovPluginManager.loadedCount();
-                        cell.setTextAndValue("Перезагрузить плагины",
-                            n == 0 ? "нет .js файлов" : (n + " загружено — нажать чтобы перечитать"), false);
+                        int total = org.telegram.messenger.ValgallovPluginManager.listAll().size();
+                        cell.setTextAndValue("Плагины",
+                            total == 0 ? "нет .js файлов"
+                                       : (n + " из " + total + " активны — нажать для управления"), true);
+                    } else if (position == performerRow) {
+                        cell.setTextAndValue("Анализатор текста",
+                            "Счётчик букв, слов и шрифтов", false);
                     }
                     break;
                 }
@@ -552,7 +545,7 @@ public class ValgallovSettingsActivity extends BaseFragment {
                 return TYPE_HEADER;
             } else if (position == ghostInfoRow || position == extraInfoRow) {
                 return TYPE_INFO;
-            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || (searchHiddenRow != -1 && position == searchHiddenRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow || (pluginsManageRow != -1 && position == pluginsManageRow)) {
+            } else if ((manageHiddenChatsRow != -1 && position == manageHiddenChatsRow) || (searchHiddenRow != -1 && position == searchHiddenRow) || position == themePresetRow || position == quickMuteRow || position == backupRow || position == readLaterRow || position == deletedHistoryRow || (pluginsManageRow != -1 && position == pluginsManageRow) || position == performerRow) {
                 return TYPE_SETTINGS;
             } else {
                 return TYPE_CHECK;
